@@ -1,7 +1,6 @@
 # AI4AnimationPy
 AI4AnimationPy is a Python framework developed by <a href="https://github.com/paulstarke">Paul Starke </a> and <a href="https://github.com/sebastianstarke">Sebastian Starke</a>, that enables character animation using neural networks and provides useful tools for motion capture processing, training & inference, and animation engineering. The codebase functions similar to the Unity version of <a href="https://github.com/sebastianstarke/AI4Animation">AI4Animation</a> in terms of game-engine behavior (i.e. ECS / update loop / behaviors / rendering pipeline) but is entirely written in Python, hence removing the Unity dependency for data-processing, feature-extraction, inference, and post-processing while providing the same math functionalities via NumPy or PyTorch.
 
-The framework includes various demos for data-driven motion controllers (i.e. locomotion, motion tracking) as well as simple demos to show the modular usage and functionality of the framework:
 <p align="center">
     <a href="https://youtu.be/LKl7MzFENUs">
     <img src="Media/Thumbnail.png", width=100%>
