@@ -1,0 +1,82 @@
+site_name: AI4AnimationPy
+site_description: Python framework for AI-driven character animation using neural networks
+site_url: https://facebookresearch.github.io/ai4animationpy/
+repo_url: https://github.com/facebookresearch/ai4animationpy
+repo_name: facebookresearch/ai4animationpy
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quickstart.md
+      - Execution Modes: getting-started/modes.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Entity-Component-System: architecture/ecs.md
+      - Lifecycle & Update Loop: architecture/lifecycle.md
+  - API Reference:
+      - Actor: api/actor.md
+      - Motion & Animation Data: api/motion.md
+      - Animation Modules: api/animation-modules.md
+      - Math Library: api/math.md
+      - AI System: api/ai-system.md
+      - Importers: api/importers.md
+      - Inverse Kinematics: api/ik.md
+  - Tutorials:
+      - Custom Component: tutorials/custom-component.md
+      - Custom Module: tutorials/custom-module.md
+      - Training a Network: tutorials/training-network.md
+      - Adding an Importer: tutorials/adding-importer.md
+  - Reference:
+      - Data Models: data-models.md
+      - Demo Programs: demos.md

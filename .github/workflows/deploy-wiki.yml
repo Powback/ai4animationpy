@@ -1,0 +1,31 @@
+name: Deploy Wiki
+
+on:
+  push:
+    branches: [wiki]
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - 'requirements-docs.txt'
+      - '.github/workflows/deploy-wiki.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: wiki
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements-docs.txt
+
+      - name: Build and deploy
+        run: mkdocs gh-deploy --force
