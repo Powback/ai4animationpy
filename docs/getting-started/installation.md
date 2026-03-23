@@ -70,23 +70,3 @@ python Demos/Actor/Program.py
 ```
 
 This should open a window displaying a character model.
-
----
-
-## Motion Data (Optional)
-
-To work with motion capture data, download one of the public datasets:
-
-| Dataset | Character | Format |
-|---------|-----------|--------|
-| [Cranberry](https://starke-consult.de/AI4Animation/SIGGRAPH_2024/Cranberry_Dataset.zip) | Cranberry | FBX & GLB |
-| [100Style retargeted](https://theorangeduck.com/media/uploads/Geno/100style-retarget/bvh.zip) | Geno | BVH |
-| [LaFan](https://github.com/ubisoft/ubisoft-laforge-animation-dataset/blob/master/lafan1/lafan1.zip) | LaFan | BVH |
-
-Convert raw motion files to the internal NPZ format using the batch converter:
-
-```bash
-convert -h
-```
-
-See the [Importers API](../api/importers.md) for details on supported formats.

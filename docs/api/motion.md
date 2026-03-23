@@ -54,32 +54,6 @@ The internal NPZ format stores:
 | `parent_names` | `[J]` | Parent name per bone (`None` for root) |
 | `framerate` | scalar | Frames per second |
 
-### Playback Flow
-
-```mermaid
-sequenceDiagram
-    participant Ed as MotionEditor
-    participant DS as Dataset
-    participant Mot as Motion
-    participant Mod as Modules
-    participant Act as Actor
-
-    Ed->>DS: LoadMotion(index)
-    DS->>Mot: Motion.LoadFromNPZ(file)
-    Mot-->>Ed: motion object
-    loop Every Frame
-        Ed->>Mot: GetBoneTransformations(t, bones, mirror)
-        Mot-->>Ed: transforms
-        Ed->>Act: SetTransforms(transforms)
-        Ed->>Mot: GetBoneVelocities(t, bones, mirror)
-        Ed->>Act: SetVelocities(velocities)
-        loop Each Module
-            Ed->>Mod: module.Callback(editor)
-        end
-        Ed->>Act: SyncToScene()
-    end
-```
-
 ---
 
 ## Hierarchy

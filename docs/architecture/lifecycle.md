@@ -4,38 +4,6 @@ AI4AnimationPy follows a game-engine-style lifecycle with distinct phases for in
 
 ---
 
-## Engine Bootstrap
-
-```mermaid
-sequenceDiagram
-    participant User as User Program
-    participant Engine as AI4Animation
-    participant Scene as Scene
-    participant SA as Standalone
-    participant RL as Raylib
-
-    User->>Engine: AI4Animation(program, STANDALONE)
-    Engine->>Scene: Scene()
-    Engine->>SA: LoadModule Standalone
-    SA->>RL: InitWindow(1920, 1080)
-    SA->>Scene: AddEntity Camera, Pipeline, Ground
-    Engine->>User: program.Start()
-    Engine->>User: program.Standalone()
-    Engine->>SA: Run()
-    loop Every Frame
-        SA->>RL: GetFrameTime()
-        SA->>Engine: Update(dt)
-        Engine->>User: program.Update()
-        Engine->>Scene: scene.Update()
-        SA->>RL: BeginDrawing
-        SA->>User: program.Draw()
-        SA->>User: program.GUI()
-        SA->>RL: EndDrawing
-    end
-```
-
----
-
 ## Lifecycle Phases
 
 ### 1. Initialization
@@ -172,9 +140,9 @@ if __name__ == "__main__":
 
 When running in standalone mode, the engine creates:
 
-- A **Raylib window** (1920×1080)
-- A **Camera** with 4 modes: Free, Fixed, Third-person, Orbit
-- A **RenderPipeline** with deferred shading, shadow mapping, SSAO, bloom, FXAA
+- A **Raylib window**
+- A **Camera**
+- A **RenderPipeline**
 - A **Ground** plane entity
 
 The render loop sequence per frame:

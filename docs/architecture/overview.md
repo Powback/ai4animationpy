@@ -137,7 +137,7 @@ The architecture is organized into distinct layers:
 4. **Math Layer** — `Tensor`, `Transform`, `Rotation`, `Quaternion`, `Vector3` for vectorized operations
 5. **AI Layer** — Neural network layers, training utilities (`DataSampler`, `FeedTensor`), and inference (`ONNXNetwork`)
 6. **Import Layer** — File format parsers (`GLB`, `FBX`, `BVH`) with a common `ModelImporter` interface
-7. **Rendering Layer** — Optional Raylib-based windowed renderer with deferred pipeline
+7. **Rendering Layer** — Optional Raylib-based windowed renderer
 8. **IK Layer** — FABRIK inverse kinematics solver
 
 ---
@@ -198,14 +198,3 @@ ai4animation/
     ├── GUI.py               # Immediate-mode GUI
     └── SkinnedMesh.py       # GPU skinning
 ```
-
----
-
-## Utility & Support Modules
-
-| Module | Purpose |
-|--------|---------|
-| `Utility.py` | `LoadModule`, `SetSeed`, `SaveONNX`, `SymmetryIndices` |
-| `AssetManager.py` | Asset file path resolution |
-| `Time.py` | `TotalTime`, `DeltaTime`, `Timescale` globals |
-| `Profiler.py` | `cProfile`-based profiler with periodic stats |

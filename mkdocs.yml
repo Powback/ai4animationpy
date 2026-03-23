@@ -79,7 +79,6 @@ nav:
       - Custom Component: tutorials/custom-component.md
       - Custom Module: tutorials/custom-module.md
       - Training a Network: tutorials/training-network.md
-      - Adding an Importer: tutorials/adding-importer.md
   - Reference:
       - Data Models: data-models.md
       - Demo Programs: demos.md

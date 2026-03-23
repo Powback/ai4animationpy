@@ -110,32 +110,6 @@ The `Bone` inner class represents a single bone in the skeleton.
 
 ---
 
-## Loading Flow
-
-```mermaid
-sequenceDiagram
-    participant User as Program
-    participant Scene as Scene
-    participant Ent as Entity
-    participant Act as Actor
-    participant GLB as GLBImporter
-
-    User->>Scene: AddEntity("Actor")
-    Scene-->>User: root entity
-    User->>Ent: AddComponent(Actor, model.glb, bones)
-    Ent->>Act: Actor.__init__
-    Act->>GLB: GLB.Create(model.glb)
-    GLB-->>Act: Model (joints, meshes, skin)
-    Act->>Act: CreateEntities()
-    loop For each joint
-        Act->>Scene: AddEntity(joint_name, parent)
-    end
-    Act->>Act: Build Bone hierarchy
-    Act->>Act: ComputeZeroTransforms
-```
-
----
-
 ## Example
 
 ```python

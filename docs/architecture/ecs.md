@@ -1,6 +1,6 @@
 # Entity-Component-System
 
-AI4AnimationPy uses an Entity-Component-System (ECS) pattern inspired by game engine design. This provides a flexible, composable architecture for building interactive animation applications.
+AI4AnimationPy uses an Entity-Component-System (ECS) pattern inspired by game engine design. This provides a flexible, composable architecture for building interactive applications.
 
 ---
 
