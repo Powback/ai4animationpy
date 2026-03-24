@@ -68,18 +68,6 @@ class Oscillator(Component):
         pass
 ```
 
-### Available Hooks
-
-| Hook | When Called | Available In |
-|------|-----------|-------------|
-| `Start(params)` | Once, at attachment time | All modes |
-| `Update()` | Every frame | All modes |
-| `Draw()` | Every frame, inside render pass | Standalone only |
-| `GUI()` | Every frame, after render | Standalone only |
-| `Standalone()` | Once, after Start | Standalone only |
-
----
-
 ## Step 3: Attach to an Entity
 
 ```python

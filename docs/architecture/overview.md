@@ -6,105 +6,98 @@ AI4AnimationPy follows a modular, layered architecture. The engine manages a sce
 
 ## System Architecture
 
+The diagram below shows how the major subsystems connect. Each layer is detailed in its own section further down.
+
 ```mermaid
-graph TB
-    subgraph Entry["Entry Point"]
-        A["AI4Animation<br/>(Main Engine)"]
+graph LR
+    Engine["🎮 Engine<br/>AI4Animation"]
+    ECS["🧩 ECS<br/>Scene · Entity · Component"]
+    Anim["🎬 Animation<br/>Motion · Dataset · Modules"]
+    Math["📐 Math<br/>Tensor · Transform · Quaternion"]
+    AI["🧠 AI<br/>Networks · DataSampler"]
+    Import["📦 Import<br/>GLB · FBX · BVH"]
+    Render["🖥️ Renderer<br/>Standalone · Camera · Pipeline"]
+    IK["🦴 IK<br/>FABRIK"]
+
+    Engine --> ECS
+    Engine --> Render
+    ECS --> Anim
+    ECS --> IK
+    Anim --> Math
+    Anim --> Import
+    AI --> Anim
+    Render --> ECS
+```
+
+### Engine & ECS
+
+```mermaid
+graph LR
+    A["AI4Animation"] -->|creates| S["Scene"]
+    S -->|manages| E["Entity"]
+    E -->|owns| C["Component"]
+    C --> Actor
+    C --> MotionEditor
+    C --> MeshRenderer
+    A -->|"mode=STANDALONE"| R["Standalone"]
+```
+
+### Animation & Modules
+
+```mermaid
+graph LR
+    D["Dataset"] -->|loads .npz| M["Motion"]
+    M -->|uses| H["Hierarchy"]
+    M -->|attaches| Mod["Module"]
+    Mod --> RootModule
+    Mod --> ContactModule
+    Mod --> MotionModule
+    Mod --> GuidanceModule
+    Mod --> TrackingModule
+    MotionEditor -->|plays| M
+    MotionEditor -->|uses| D
+```
+
+### Import & Math
+
+```mermaid
+graph LR
+    subgraph Import
+        GLB["GLBImporter"]
+        FBX["FBXImporter"]
+        BVH["BVHImporter"]
+        CLI["BatchConverter"]
     end
 
-    subgraph Core["Core ECS"]
-        B["Scene<br/>(World Manager)"]
-        C["Entity<br/>(Game Object)"]
-        D["Component<br/>(Behavior Base)"]
+    subgraph Math
+        Tensor --> Transform
+        Tensor --> Rotation
+        Tensor --> Quaternion
+        Tensor --> Vector3
     end
 
-    subgraph Components["Built-in Components"]
-        E["Actor<br/>(Skeleton + Bones)"]
-        F["MotionEditor<br/>(Playback UI)"]
-        G["MeshRenderer<br/>(Static Mesh)"]
+    GLB & FBX & BVH -->|produce| Motion
+    CLI -->|batch converts via| GLB & FBX & BVH
+```
+
+### AI & Rendering
+
+```mermaid
+graph LR
+    subgraph AI
+        DS["DataSampler"] -->|samples| Dataset
+        Net["Networks<br/>MLP · AE · Flow"] -->|trained via| DS
+        FT["FeedTensor / ReadTensor"] -->|I/O| Net
+        Stats -->|normalizes| FT
+        ONNX["ONNXNetwork"] -->|inference| Net
     end
 
-    subgraph AnimSys["Animation System"]
-        H["Motion<br/>(Frame Data)"]
-        I["Hierarchy<br/>(Bone Tree)"]
-        J["Dataset<br/>(NPZ Loader)"]
-        K["TimeSeries<br/>(Temporal Window)"]
-        L["Module<br/>(Feature Base)"]
+    subgraph Renderer
+        Standalone -->|uses| RP["RenderPipeline"]
+        Standalone -->|uses| Camera
+        Standalone -->|uses| DrawGUI["Draw / GUI"]
+        RP -->|renders| SM["SkinnedMesh"]
     end
-
-    subgraph AnimModules["Animation Modules"]
-        M["RootModule"]
-        N["ContactModule"]
-        O["MotionModule"]
-        P["GuidanceModule"]
-        Q["TrackingModule"]
-    end
-
-    subgraph MathLib["Math Library"]
-        R["Tensor<br/>(NumPy/PyTorch)"]
-        S["Transform<br/>(4x4 Matrices)"]
-        T["Rotation<br/>(3x3 Matrices)"]
-        U["Quaternion<br/>(4D Rotations)"]
-        V["Vector3<br/>(3D Vectors)"]
-    end
-
-    subgraph AISystem["AI System"]
-        W["Networks<br/>(MLP, AE, Flow)"]
-        X["DataSampler<br/>(Batch Generator)"]
-        Y["FeedTensor / ReadTensor<br/>(I/O Buffers)"]
-        Z["Stats<br/>(Running Normalization)"]
-        AA["ONNXNetwork<br/>(ONNX Inference)"]
-    end
-
-    subgraph ImportSys["Import System"]
-        AB["GLBImporter"]
-        AC["FBXImporter"]
-        AD["BVHImporter"]
-        AE["ModelImporter<br/>(ABC)"]
-        AF["BatchConverter<br/>(CLI)"]
-    end
-
-    subgraph Standalone["Standalone Renderer"]
-        AG["Standalone<br/>(Raylib Window)"]
-        AH["RenderPipeline"]
-        AI["Camera"]
-        AJ["Draw / GUI"]
-        AK["SkinnedMesh"]
-    end
-
-    subgraph IKSys["IK System"]
-        AL["FABRIK<br/>(IK Solver)"]
-    end
-
-    A -->|"creates"| B
-    A -->|"mode=STANDALONE"| AG
-    B -->|"manages"| C
-    C -->|"owns"| D
-    D -->|"extends"| E
-    D -->|"extends"| F
-    D -->|"extends"| G
-    E -->|"loads model via"| AE
-    F -->|"plays"| H
-    F -->|"uses"| J
-    H -->|"uses"| I
-    H -->|"loaded from"| AB
-    H -->|"loaded from"| AC
-    H -->|"loaded from"| AD
-    H -->|"attaches"| L
-    L -->|"extends"| M
-    L -->|"extends"| N
-    L -->|"extends"| O
-    L -->|"extends"| P
-    L -->|"extends"| Q
-    J -->|"loads NPZ into"| H
-    X -->|"samples from"| J
-    W -->|"trained via"| X
-    Y -->|"feeds/reads"| W
-    AG -->|"renders via"| AH
-    AH -->|"uses"| AK
-    AG -->|"uses"| AI
-    AG -->|"uses"| AJ
-    AL -->|"operates on"| E
 ```
 
 ---

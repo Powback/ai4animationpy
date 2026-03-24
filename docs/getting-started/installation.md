@@ -18,9 +18,6 @@ AI4AnimationPy requires Python 3.12+ and uses Conda for environment management. 
     pip install -e . --use-pep517
     ```
 
-    !!! note
-        You may need to adjust the PyTorch/CUDA version based on your GPU.
-
 === "Linux"
 
     ```bash
@@ -40,6 +37,8 @@ AI4AnimationPy requires Python 3.12+ and uses Conda for environment management. 
     pip install onnxruntime
     pip install -e . --no-dependencies
     ```
+!!! note
+    You may need to adjust the PyTorch/CUDA version based on your GPU.
 
 ---
 

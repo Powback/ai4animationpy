@@ -39,7 +39,7 @@ It provides motion capture processing, training & inference, animation engineeri
 - :material-rocket-launch: **[Quick Start](getting-started/quickstart.md)** — Run your first program
 - :material-sitemap: **[Architecture](architecture/overview.md)** — Understand the system design
 - :material-api: **[API Reference](api/actor.md)** — Explore the full API
-- :material-school: **[Tutorials](tutorials/custom-component.md)** — Step-by-step guides
-- :material-format-list-bulleted: **[Demos](demos.md)** — Browse example programs
+- :material-format-list-bulleted: **[Demos](tutorials/demos.md)** — Browse example programs
+- :material-school: **[Tutorials](tutorials/custom-component.md)** — Guides & Demos
 
 </div>

@@ -62,23 +62,19 @@ nav:
   - Getting Started:
       - Installation: getting-started/installation.md
       - Quick Start: getting-started/quickstart.md
-      - Execution Modes: getting-started/modes.md
   - Architecture:
       - Overview: architecture/overview.md
       - Entity-Component-System: architecture/ecs.md
       - Lifecycle & Update Loop: architecture/lifecycle.md
   - API Reference:
       - Actor: api/actor.md
-      - Motion & Animation Data: api/motion.md
+      - Motion Data: api/motion.md
       - Animation Modules: api/animation-modules.md
       - Math Library: api/math.md
-      - AI System: api/ai-system.md
-      - Importers: api/importers.md
       - Inverse Kinematics: api/ik.md
+      - Data Models: api/data-models.md
   - Tutorials:
+      - Demo Programs: tutorials/demos.md
       - Custom Component: tutorials/custom-component.md
       - Custom Module: tutorials/custom-module.md
       - Training a Network: tutorials/training-network.md
-  - Reference:
-      - Data Models: data-models.md
-      - Demo Programs: demos.md
