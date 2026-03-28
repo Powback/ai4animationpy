@@ -72,6 +72,10 @@ scheduler = CyclicScheduler(
 
 A minimal training example (derived from `Demos/AI/ToyExample/Program.py`):
 
+<video controls autoplay loop muted width="100%">
+  <source src="../../assets/videos/TrainingToyExample.mp4" type="video/mp4">
+</video>
+
 ```python
 import numpy as np
 import torch

@@ -65,8 +65,9 @@ actor.SyncFromScene()
 ### Accessing Bones
 
 ```python
-bone = actor.GetBone("LeftHand")
-bone = actor.Bones[5]
+bone = actor.GetBone(bone_name)
+bone = actor.GetBone(bone_index)
+bone = actor.GetBone(bone)
 chain = actor.GetChain("Shoulder", "Wrist")
 ```
 
@@ -133,3 +134,7 @@ class Program:
         positions = self.Actor.GetPositions()
         rotations = self.Actor.GetRotations()
 ```
+
+<video controls autoplay loop muted width="100%">
+  <source src="../../assets/videos/Actor.mp4" type="video/mp4">
+</video>

@@ -10,6 +10,10 @@ Forward And Backward Reaching Inverse Kinematics solver operating on `Actor.Bone
 
 FABRIK is an iterative IK algorithm that solves for joint positions along a bone chain to reach a target position and rotation. It works by alternating forward and backward passes along the chain, adjusting joint positions to satisfy distance constraints.
 
+<video controls autoplay loop muted width="100%">
+  <source src="../../assets/videos/IK.mp4" type="video/mp4">
+</video>
+
 ---
 
 ## API

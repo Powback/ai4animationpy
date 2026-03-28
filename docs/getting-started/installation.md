@@ -69,3 +69,8 @@ python Demos/Actor/Program.py
 ```
 
 This should open a window displaying a character model.
+
+<video controls autoplay loop muted width="100%">
+  <source src="../../assets/videos/Actor.mp4" type="video/mp4">
+</video>
+

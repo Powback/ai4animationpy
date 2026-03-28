@@ -4,18 +4,6 @@ Reference table of all demo programs included in the repository. Each demo illus
 
 ---
 
-## Running Demos
-
-From the repository root:
-
-```bash
-python Demos/<DemoName>/Program.py
-```
-
-Most demos run in **Standalone mode** (windowed rendering). Some can also run headless.
-
----
-
 ## Demo Index
 
 | Demo | Description | Key Concepts | Mode |
@@ -31,3 +19,65 @@ Most demos run in **Standalone mode** (windowed rendering). Some can also run he
 | **[Locomotion](https://github.com/facebookresearch/ai4animationpy/tree/main/Demos/Locomotion)** | Neural network driven locomotion | Full inference pipeline, `FeedTensor`/`ReadTensor`, IK | Standalone |
 | **[AI/ToyExample](https://github.com/facebookresearch/ai4animationpy/tree/main/Demos/AI/ToyExample)** | Minimal training example | `MLP`, optimizer, scheduler, loss history | Standalone |
 | **[AI/Autoencoder](https://github.com/facebookresearch/ai4animationpy/tree/main/Demos/AI/Autoencoder)** | Autoencoder training on motion data | VAE, motion features, `DataSampler` | Standalone |
+
+---
+
+## Video Previews
+
+The following clips are recorded from the included demos and workflows.
+
+### Stylized Locomotion
+
+<video controls preload="metadata" width="100%">
+	<source src="../../assets/videos/Locomotion.mp4" type="video/mp4">
+	Your browser does not support the video tag.
+</video>
+
+### Training Toy Example
+
+<video controls preload="metadata" width="100%">
+	<source src="../../assets/videos/TrainingToyExample.mp4" type="video/mp4">
+	Your browser does not support the video tag.
+</video>
+
+### Training Future Motion Prediction
+
+<video controls preload="metadata" width="100%">
+	<source src="../../assets/videos/Training.mp4" type="video/mp4">
+	Your browser does not support the video tag.
+</video>
+
+### ECS
+
+<video controls preload="metadata" width="100%">
+	<source src="../../assets/videos/ECS.mp4" type="video/mp4">
+	Your browser does not support the video tag.
+</video>
+
+### Actor
+
+<video controls preload="metadata" width="100%">
+	<source src="../../assets/videos/Actor.mp4" type="video/mp4">
+	Your browser does not support the video tag.
+</video>
+
+### Motion Import (GLB/BVH/NPZ)
+
+<video controls preload="metadata" width="100%">
+	<source src="../../assets/videos/MocapImport.mp4" type="video/mp4">
+	Your browser does not support the video tag.
+</video>
+
+### Motion Editor
+
+<video controls preload="metadata" width="100%">
+	<source src="../../assets/videos/MotionEditor.mp4" type="video/mp4">
+	Your browser does not support the video tag.
+</video>
+
+### Inverse Kinematics
+
+<video controls preload="metadata" width="100%">
+	<source src="../../assets/videos/IK.mp4" type="video/mp4">
+	Your browser does not support the video tag.
+</video>

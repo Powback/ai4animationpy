@@ -168,3 +168,7 @@ class Program:
 if __name__ == "__main__":
     AI4Animation(Program(), mode=AI4Animation.Mode.STANDALONE)
 ```
+
+<video controls autoplay loop muted width="100%">
+  <source src="../../assets/videos/ECS.mp4" type="video/mp4">
+</video>

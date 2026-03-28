@@ -56,7 +56,7 @@ When `AI4Animation(program, mode)` is called:
 3. `program.Start()` is called — set up entities, components, and data here
 4. `program.Standalone()` is called (standalone mode only) — configure GUI, camera targets
 
-### 2. Update Phase
+### 2. Update
 
 Called every frame before rendering:
 
@@ -70,7 +70,7 @@ AI4Animation.__UPDATE__()
 
 **Order:** Your program's `Update()` runs first, then the scene updates all entities and their components.
 
-### 3. Draw Phase
+### 3. Draw
 
 Called every frame inside the render pass (standalone only):
 
@@ -84,7 +84,7 @@ AI4Animation.__DRAW__()
 
 Use `Draw()` to render debug visualizations, shapes, lines, etc. via `AI4Animation.Draw`.
 
-### 4. GUI Phase
+### 4. GUI
 
 Called every frame after rendering (standalone only):
 
@@ -100,7 +100,7 @@ Use `GUI()` for immediate-mode UI elements like sliders, buttons, text overlays.
 
 ---
 
-## Frame Timing
+## Time
 
 The `Time` module provides frame timing globals:
 
@@ -219,11 +219,11 @@ for i in range(1000):
 - Full control over frame timing and step count
 - No rendering (same as Headless in that regard)
 
-**When to use:** Integration with external systems, unit testing, custom simulation loops, Jupyter notebooks.
+**When to use:** Integration with external systems, custom simulation loops, Jupyter notebooks.
 
 ---
 
-## Standalone Renderer Details
+## Standalone Renderer
 
 When running in standalone mode, the engine creates:
 

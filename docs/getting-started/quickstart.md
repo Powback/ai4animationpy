@@ -84,6 +84,10 @@ if __name__ == "__main__":
 
 AI4AnimationPy supports importing mesh, skin, and animation data from **GLB**, **FBX**, and **BVH** files. The internal motion format is `.npz`, which stores 7 dimensions (3D position + 4D quaternion) for each skeleton joint per frame.
 
+<video controls autoplay loop muted width="100%">
+  <source src="../../assets/videos/MocapImport.mp4" type="video/mp4">
+</video>
+
 ### Loading Motion Files in Code
 
 Use the `Motion` class to load directly from any supported format:
@@ -217,3 +221,7 @@ if __name__ == "__main__":
 2. Attaches animation modules (root trajectory, motion, contacts, guidance)
 3. The `MotionEditor` component provides a GUI timeline for scrubbing through clips
 4. Camera follows the editor entity
+
+<video controls autoplay loop muted width="100%">
+  <source src="../../assets/videos/MotionEditor.mp4" type="video/mp4">
+</video>

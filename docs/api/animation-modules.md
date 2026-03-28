@@ -4,6 +4,10 @@ Pluggable analysis modules that compute motion features from a `Motion` object. 
 
 **Base File:** `ai4animation/Animation/Module.py`
 
+<video controls autoplay loop muted width="100%">
+  <source src="../../assets/videos/MotionEditor.mp4" type="video/mp4">
+</video>
+
 ---
 
 ## Module Base Class
