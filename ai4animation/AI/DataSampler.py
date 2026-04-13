@@ -10,9 +10,11 @@ from tqdm import tqdm
 
 
 class DataSampler:
-    def __init__(self, dataset, framerate, batch_size, function):
+    def __init__(self, dataset, framerate, batch_size, function, start_padding=0.0, end_padding=0.0):
         self.Dataset = dataset
         self.Framerate = framerate
+        self.StartPadding = start_padding
+        self.EndPadding = end_padding
         self.BatchSize = batch_size
         self.Function = function
 
@@ -45,7 +47,7 @@ class DataSampler:
                     self.Motions[index] = future.result()
                     pbar.update(1)
 
-        self.Timestamps = [m.GetTimestamps(self.Framerate) for m in self.Motions]
+        self.Timestamps = [m.GetTimestamps(self.Framerate, self.StartPadding, self.EndPadding) for m in self.Motions]
 
         self.SampleCount = sum([len(t) for t in self.Timestamps])
         print("Training Samples:", self.SampleCount)

@@ -1,4 +1,6 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
+import builtins
+import numpy as np
 import raylib as rl
 from ai4animation import Time, Utility
 from ai4animation.AI4Animation import AI4Animation
@@ -547,6 +549,152 @@ def BarPlot(x, y, w, h, values, label=None, min=None, max=None):
             color=AI4Animation.Color.BLACK,
             pivot=0.5,
         )
+
+
+def CurvePlot(
+    x,
+    y,
+    w,
+    h,
+    values,
+    label=None,
+    min=None,
+    max=None,
+    colors=None,
+    curveLabels=None,
+    backgroundColor=None,
+    frameColor=None,
+):
+    if len(values.shape) > 3:
+        print(
+            "Drawing curve plot for tensors with more than 2 dimensions is not supported."
+        )
+        return
+
+    if len(values.shape) == 1:
+        values = values.reshape(1, -1)
+
+    rectangle = Rectangle(x, y, w, h)
+    screenRectangle = rectangle.Screen()
+    rows = values.shape[0]
+    cols = values.shape[1]
+
+    if cols < 2:
+        return
+
+    backgroundColor = (
+        Utility.Opacity(AI4Animation.Color.WHITE, 0.5)
+        if backgroundColor is None
+        else backgroundColor
+    )
+    frameColor = AI4Animation.Color.BLACK if frameColor is None else frameColor
+    colors = (
+        [
+            AI4Animation.Color.RED,
+            AI4Animation.Color.BLUE,
+            AI4Animation.Color.GREEN,
+            AI4Animation.Color.ORANGE,
+            AI4Animation.Color.PURPLE,
+            AI4Animation.Color.BLACK,
+        ]
+        if colors is None
+        else colors
+    )
+
+    values_min = float(np.min(values)) if min is None else min
+    values_max = float(np.max(values)) if max is None else max
+    if values_min == values_max:
+        values_max = values_min + 1.0
+
+    rl.DrawRectangleRec(screenRectangle.Tuple(), backgroundColor)
+
+    label_font_size = builtins.max(10, int(ScreenHeight() * (h / 6.0)))
+    legend_font_size = builtins.max(10, int(ScreenHeight() * (h / 9.0)))
+    label_height = 0.0 if label is None else label_font_size / ScreenHeight() + 0.01
+
+    legend_count = 0
+    if curveLabels is not None:
+        legend_count = len(curveLabels)
+
+    legend_height = 0.0 if legend_count == 0 else legend_font_size / ScreenHeight() + 0.016
+    top_padding = 0.025 * h + label_height + legend_height
+    left_padding = 0.03 * w
+    right_padding = 0.02 * w
+    bottom_padding = 0.05 * h
+
+    plot_left = x + left_padding
+    plot_right = x + w - right_padding
+    plot_top = y + top_padding
+    plot_bottom = y + h - bottom_padding
+
+    grid_color = Utility.Opacity(frameColor, 0.25)
+    for step in range(1, 4):
+        grid_y = Utility.Normalize(step, 0, 4, plot_bottom, plot_top)
+        rl.DrawLine(
+            int(ScreenWidth() * plot_left),
+            int(ScreenHeight() * grid_y),
+            int(ScreenWidth() * plot_right),
+            int(ScreenHeight() * grid_y),
+            grid_color,
+        )
+
+    for row in range(rows):
+        color = colors[row % len(colors)]
+        for col in range(1, cols):
+            prev_value = values[row, col - 1]
+            next_value = values[row, col]
+            prev_value = min if min is not None and prev_value < min else prev_value
+            prev_value = max if max is not None and prev_value > max else prev_value
+            next_value = min if min is not None and next_value < min else next_value
+            next_value = max if max is not None and next_value > max else next_value
+
+            x1 = ScreenWidth() * Utility.Normalize(col - 1, 0, cols - 1, plot_left, plot_right)
+            x2 = ScreenWidth() * Utility.Normalize(col, 0, cols - 1, plot_left, plot_right)
+            y1 = ScreenHeight() * Utility.Normalize(prev_value, values_min, values_max, plot_bottom, plot_top)
+            y2 = ScreenHeight() * Utility.Normalize(next_value, values_min, values_max, plot_bottom, plot_top)
+            rl.DrawLine(int(x1), int(y1), int(x2), int(y2), color)
+
+        final_value = values[row, -1]
+        final_value = min if min is not None and final_value < min else final_value
+        final_value = max if max is not None and final_value > max else final_value
+        final_x = ScreenWidth() * plot_right
+        final_y = ScreenHeight() * Utility.Normalize(final_value, values_min, values_max, plot_bottom, plot_top)
+        rl.DrawCircle(int(final_x), int(final_y), 3.0, color)
+
+    rl.DrawRectangleLinesEx(screenRectangle.Tuple(), 2.0, frameColor)
+
+    if label is not None:
+        AI4Animation.Draw.Text(
+            label,
+            x + w / 2.0,
+            y + 0.015,
+            size=h / 6.0,
+            color=AI4Animation.Color.BLACK,
+            pivot=0.5,
+        )
+
+    if legend_count > 0:
+        legend_row_y = y + 0.015 + label_height
+        marker_size = 0.012
+        marker_gap = 0.006
+        slot_width = (plot_right - plot_left) / legend_count
+        for idx, curveLabel in enumerate(curveLabels):
+            text_width = (
+                rl.MeasureText(Utility.ToBytes(curveLabel), legend_font_size)
+                / ScreenWidth()
+            )
+            item_width = marker_size + marker_gap + text_width
+            slot_left = plot_left + idx * slot_width
+            item_x = slot_left + (slot_width - item_width) / 2.0
+            marker = Rectangle(item_x, legend_row_y + 0.002, marker_size, marker_size).Screen()
+            rl.DrawRectangleRec(marker.Tuple(), colors[idx % len(colors)])
+            AI4Animation.Draw.Text(
+                curveLabel,
+                item_x + marker_size + marker_gap,
+                legend_row_y,
+                size=h / 9.0,
+                color=AI4Animation.Color.BLACK,
+            )
 
 
 def HorizontalPivot(

@@ -39,12 +39,14 @@ While both Standalone and Headless mode invoke automatic update callbacks, the M
 ## Interactive Demos
 | | |
 |---|---|
-| ![Locomotion Demo](Media/Locomotion.gif) | ![Training Demo](Media/Training.gif) |
-| **Stylized Locomotion Controller** trained on style100 | **Future Motion Anticipation** with Interactive model training visualization |
-| ![ECS Demo](Media/ECS.gif) | ![IK Demo](Media/IK.gif) |
-| **ECS** — Entity hierarchy and component system | **Inverse Kinematics** — Real-time IK solving |
-| ![MocapImport Demo](Media/MocapImport.gif) | ![MotionEditor Demo](Media/MotionEditor.gif) |
-| **Motion Capture Import** — GLB/FBX/BVH/NPZ loading | **Motion Editor** — animation browsing and feature visualization|
+| ![Locomotion Demo](Media/Biped_Locomotion.gif) | ![Quadruped Demo](Media/Quadruped_Locomotion.gif) |
+| **Stylized Biped Locomotion Controller** trained on style100 | **Quadruped Locomotion Controller** — Interactive dog locomotion with gait transitions and action poses |
+| ![Training Demo](Media/Training.gif) | ![ECS Demo](Media/ECS.gif) |
+| **Future Motion Anticipation** with Interactive model training visualization | **ECS** — Entity hierarchy and component system |
+| ![IK Demo](Media/IK.gif) | ![MocapImport Demo](Media/MocapImport.gif) |
+| **Inverse Kinematics** — Real-time IK solving | **Motion Capture Import** — GLB/FBX/BVH/NPZ loading |
+| ![MotionEditor Demo](Media/MotionEditor.gif) | |
+| **Motion Editor** — animation browsing and feature visualization| |
 
 [View all demos  →](https://facebookresearch.github.io/ai4animationpy/tutorials/demos/)
 

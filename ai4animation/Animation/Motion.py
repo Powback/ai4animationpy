@@ -24,7 +24,7 @@ class Motion:
         self.Correction = Rotation.Euler(Vector3.Zero(len(hierarchy.BoneNames)))
         for i, sym_idx in enumerate(self.Symmetry):
             self.Correction[i : i + 1] = (
-                Rotation.Euler(0, 0, 180) if sym_idx != i else Rotation.Euler(0, 0, 0)
+                Rotation.Euler(0, 0, 0) if sym_idx != i else Rotation.Euler(0, 0, 0)
             )
         self.NeedsCorrection: bool = not Tensor.All(
             self.Correction == Rotation.Euler(0, 0, 0)
@@ -67,8 +67,13 @@ class Motion:
         )
         return Tensor.ToInt(indices)
 
-    def GetTimestamps(self, framerate):
-        return Tensor.Arange(0.0, self.TotalTime, 1.0 / framerate)
+    def GetTimestamps(self, framerate, start_padding=0.0, end_padding=0.0):
+        if self.TotalTime - end_padding <= 0:
+            print(
+                f"Warning: Total time ({self.TotalTime:.2f}s) is less than or equal to end padding ({end_padding:.2f}s). No timestamps will be generated."
+            )
+            return Tensor.Zeros(0)
+        return Tensor.Arange(start_padding, self.TotalTime - end_padding, 1.0 / framerate)
 
     def GetBoneIndices(self, names_or_indices=None):
         if names_or_indices is None:

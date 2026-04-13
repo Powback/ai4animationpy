@@ -57,7 +57,7 @@ class Program:
         editor.AddComponent(
             MotionEditor,
             self.dataset,
-            os.path.join(ASSETS_PATH, "Wolf.glb"),
+            os.path.join(ASSETS_PATH, "Dog.glb"),
             Definitions.FULL_BODY_NAMES
         )
 

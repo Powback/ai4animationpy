@@ -15,6 +15,7 @@ THIS_DIR = Path(__file__).resolve().parent
 CONTROLLER_TEXTURE = pr.load_texture(str(THIS_DIR / "resources/xbox.png"))
 STICK_DEADZONE = 0.1
 TRIGGER_DEADZONE = -0.9
+TRIGGER_PRESSED_THRESHOLD = -0.5
 CONTROLLER_ID = 0
 
 
@@ -88,9 +89,23 @@ def IsL1Pressed():
         CONTROLLER_ID, pr.GamepadButton.GAMEPAD_BUTTON_LEFT_TRIGGER_1
     )
 
+
+def IsL1Down():
+    LogErrorIfGamepadNotAvailable()
+    return pr.is_gamepad_button_down(
+        CONTROLLER_ID, pr.GamepadButton.GAMEPAD_BUTTON_LEFT_TRIGGER_1
+    )
+
 def IsR1Pressed():
     LogErrorIfGamepadNotAvailable()
     return pr.is_gamepad_button_pressed(
+        CONTROLLER_ID, pr.GamepadButton.GAMEPAD_BUTTON_RIGHT_TRIGGER_1
+    )
+
+
+def IsR1Down():
+    LogErrorIfGamepadNotAvailable()
+    return pr.is_gamepad_button_down(
         CONTROLLER_ID, pr.GamepadButton.GAMEPAD_BUTTON_RIGHT_TRIGGER_1
     )
 
@@ -100,10 +115,42 @@ def IsL2Pressed():
         CONTROLLER_ID, pr.GamepadButton.GAMEPAD_BUTTON_LEFT_TRIGGER_2
     )
 
+
+def IsL2Down():
+    LogErrorIfGamepadNotAvailable()
+    return pr.is_gamepad_button_down(
+        CONTROLLER_ID, pr.GamepadButton.GAMEPAD_BUTTON_LEFT_TRIGGER_2
+    ) or GetLeftTrigger() > TRIGGER_PRESSED_THRESHOLD
+
 def IsR2Pressed():
     LogErrorIfGamepadNotAvailable()
     return pr.is_gamepad_button_pressed(
         CONTROLLER_ID, pr.GamepadButton.GAMEPAD_BUTTON_RIGHT_TRIGGER_2
+    )
+
+
+def IsR2Down():
+    LogErrorIfGamepadNotAvailable()
+    return pr.is_gamepad_button_down(
+        CONTROLLER_ID, pr.GamepadButton.GAMEPAD_BUTTON_RIGHT_TRIGGER_2
+    ) or GetRightTrigger() > TRIGGER_PRESSED_THRESHOLD
+
+def IsRightFaceRightPressed():
+    LogErrorIfGamepadNotAvailable()
+    return pr.is_gamepad_button_pressed(
+        CONTROLLER_ID, pr.GamepadButton.GAMEPAD_BUTTON_RIGHT_FACE_RIGHT
+    )
+
+def IsRightFaceDownPressed():
+    LogErrorIfGamepadNotAvailable()
+    return pr.is_gamepad_button_pressed(
+        CONTROLLER_ID, pr.GamepadButton.GAMEPAD_BUTTON_RIGHT_FACE_DOWN
+    )
+
+def IsRightFaceLeftPressed():
+    LogErrorIfGamepadNotAvailable()
+    return pr.is_gamepad_button_pressed(
+        CONTROLLER_ID, pr.GamepadButton.GAMEPAD_BUTTON_RIGHT_FACE_LEFT
     )
 
 def GetCurrentKey():

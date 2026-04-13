@@ -50,6 +50,7 @@ from .Import.GLBImporter import GLB
 
 # Math classes - re-export for convenience
 from .Math import Quaternion, Rotation, Tensor, Transform, Vector3
+from .PID import PID
 from .Profiler import Profiler
 from .Scene import Scene
 
@@ -68,6 +69,7 @@ __all__ = [
     "Time",
     "Utility",
     "Profiler",
+    "PID",
     "AssetManager",
     # Subpackages
     "Math",
