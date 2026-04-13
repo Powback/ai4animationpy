@@ -16,7 +16,8 @@ Reference table of all demo programs included in the repository. Each demo illus
 | **[BVHLoading](https://github.com/facebookresearch/ai4animationpy/tree/main/Demos/BVHLoading)** | Load motion from BVH format | `BVHImporter`, `Motion` | Standalone |
 | **[MotionEditor](https://github.com/facebookresearch/ai4animationpy/tree/main/Demos/MotionEditor)** | Browse and play motion clips with timeline | `MotionEditor`, `Dataset`, animation modules | Standalone |
 | **[InverseKinematics](https://github.com/facebookresearch/ai4animationpy/tree/main/Demos/InverseKinematics)** | Real-time IK with draggable target | `FABRIK` solver, `Actor.GetBone` | Standalone |
-| **[Locomotion](https://github.com/facebookresearch/ai4animationpy/tree/main/Demos/Locomotion)** | Neural network driven locomotion | Full inference pipeline, `FeedTensor`/`ReadTensor`, IK | Standalone |
+| **[Locomotion/Biped](https://github.com/facebookresearch/ai4animationpy/tree/main/Demos/Locomotion/Biped)** | Stylized biped neural network locomotion | Full inference pipeline, `FeedTensor`/`ReadTensor`, IK | Standalone |
+| **[Locomotion/Quadruped](https://github.com/facebookresearch/ai4animationpy/tree/main/Demos/Locomotion/Quadruped)** | Quadruped neural network locomotion | Gait transitions, action poses, `GuidanceModule` | Standalone |
 | **[AI/ToyExample](https://github.com/facebookresearch/ai4animationpy/tree/main/Demos/AI/ToyExample)** | Minimal training example | `MLP`, optimizer, scheduler, loss history | Standalone |
 | **[AI/Autoencoder](https://github.com/facebookresearch/ai4animationpy/tree/main/Demos/AI/Autoencoder)** | Autoencoder training on motion data | VAE, motion features, `DataSampler` | Standalone |
 
@@ -26,10 +27,17 @@ Reference table of all demo programs included in the repository. Each demo illus
 
 The following clips are recorded from the included demos and workflows.
 
-### Stylized Locomotion
+### Biped Locomotion
 
 <video controls preload="metadata" width="100%">
-	<source src="../../assets/videos/Locomotion.mp4" type="video/mp4">
+	<source src="../../assets/videos/Biped_Locomotion.mp4" type="video/mp4">
+	Your browser does not support the video tag.
+</video>
+
+### Quadruped Locomotion
+
+<video controls preload="metadata" width="100%">
+	<source src="../../assets/videos/Quadruped_Locomotion.mp4" type="video/mp4">
 	Your browser does not support the video tag.
 </video>
 
