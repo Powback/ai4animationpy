@@ -1,0 +1,30 @@
+services:
+  ai4anim:
+    build:
+      context: .
+      network: host
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    container_name: ai4anim
+    restart: unless-stopped
+    environment:
+      - NO_BROWSER=1
+      - PORT=7860
+      - PRELOAD_DEMOS=all
+      - MAX_CPU_THREADS=8
+      - OMP_NUM_THREADS=8
+      - MKL_NUM_THREADS=8
+      - TORCH_NUM_THREADS=8
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ai4anim.rule=Host(`ai4anim.pow`)"
+      - "traefik.http.routers.ai4anim.entrypoints=web"
+      - "traefik.http.services.ai4anim.loadbalancer.server.port=7860"
+    networks:
+      - default
+      - traefik
+
+networks:
+  traefik:
+    external: true
