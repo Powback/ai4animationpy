@@ -703,6 +703,83 @@ kbd {
     color: #fff;
 }
 
+/* ── View Mode Switcher (Dog / Go1 / Split) ──────────────── */
+
+#view-mode-row {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 15;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(8px);
+    padding: 4px;
+    border-radius: 8px;
+    display: flex;
+    gap: 2px;
+}
+
+.view-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: #bbb;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.12s ease;
+}
+
+.view-btn:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.view-btn.active {
+    background: rgba(80, 140, 255, 0.32);
+    border-color: rgba(120, 165, 255, 0.55);
+    color: #fff;
+}
+
+#split-divider {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    background: rgba(255, 255, 255, 0.22);
+    box-shadow: 0 0 12px rgba(0, 0, 0, 0.45);
+    z-index: 14;
+    pointer-events: none;
+    transform: translateX(-0.5px);
+}
+
+.split-label {
+    position: fixed;
+    top: 52px;
+    z-index: 14;
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #e6ecff;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    pointer-events: none;
+}
+
+#split-label-left {
+    left: calc(25% - 32px);
+}
+
+#split-label-right {
+    right: calc(25% - 24px);
+}
+
 /* ── Touch Controls (mobile) ─────────────────────────────── */
 
 #touch-controls {
@@ -984,6 +1061,23 @@ kbd {
 
     body[data-demo="quadruped"] #speed-bar {
         width: 100%;
+    }
+
+    body[data-demo="quadruped"] #view-mode-row {
+        top: calc(env(safe-area-inset-top) + 48px);
+        right: 12px;
+        padding: 3px;
+    }
+
+    body[data-demo="quadruped"] .view-btn {
+        padding: 5px 10px;
+        font-size: 11px;
+    }
+
+    body[data-demo="quadruped"] .split-label {
+        top: calc(env(safe-area-inset-top) + 92px);
+        font-size: 10px;
+        padding: 3px 8px;
     }
 }
 

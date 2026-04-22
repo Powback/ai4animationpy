@@ -48,16 +48,32 @@ let lastRenderAt = 0;
 const keys = {};
 let gamepadIndex = -1;
 let currentRootPos = new THREE.Vector3();
+const go1CurrentRootPos = new THREE.Vector3();
 let cameraDistance = 4.0;
 let cameraPhi = Math.PI / 9;
 let cameraTheta = 0;
 const CAM_SELF_HEIGHT = 0.5;
 const CAM_TARGET_HEIGHT = 0.5;
 const CAM_SMOOTHING = 10.0;
-let cameraTarget = new THREE.Vector3(0, CAM_TARGET_HEIGHT, 0);
-let cameraPos = new THREE.Vector3(0, CAM_SELF_HEIGHT, cameraDistance);
+const dogCamTarget = new THREE.Vector3(0, CAM_TARGET_HEIGHT, 0);
+const dogCamPos = new THREE.Vector3(0, CAM_SELF_HEIGHT, cameraDistance);
+const go1CamTarget = new THREE.Vector3(0, CAM_TARGET_HEIGHT, 0);
+const go1CamPos = new THREE.Vector3(0, CAM_SELF_HEIGHT, cameraDistance);
 let lastFrameTime = performance.now();
 let currentSpeed = 0.0;
+
+// View mode: "dog" (MANN only), "go1" (physics only), "split" (side by side)
+const VIEW_MODES = ["dog", "go1", "split"];
+let viewMode = "dog";
+let go1Available = false;
+
+// Layers partition which objects each camera renders:
+//   0 → shared scenery (ground, grid, lights)
+//   1 → MANN dog mesh + MANN-specific debug (trajectories, bones, axes)
+//   2 → Go1 physics rig
+const LAYER_SHARED = 0;
+const LAYER_DOG = 1;
+const LAYER_GO1 = 2;
 
 const _pos = new THREE.Vector3();
 const _quat = new THREE.Quaternion();
@@ -91,6 +107,12 @@ scene.fog = new THREE.Fog(0x2a2a3e, 15, 40);
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
 camera.position.set(0, 2, 6);
+camera.layers.enable(LAYER_DOG);
+
+// Second camera used for the right half of split view and for "Go1 only" mode.
+const go1Camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+go1Camera.position.set(0, 2, 6);
+go1Camera.layers.enable(LAYER_GO1);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -101,7 +123,8 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.2;
 document.getElementById("viewport").appendChild(renderer.domElement);
 
-scene.add(new THREE.AmbientLight(0x8899bb, 0.8));
+const ambientLight = new THREE.AmbientLight(0x8899bb, 0.8);
+scene.add(ambientLight);
 const dirLight = new THREE.DirectionalLight(0xffeedd, 2.0);
 dirLight.position.set(5, 10, 5);
 dirLight.castShadow = true;
@@ -114,7 +137,13 @@ dirLight.shadow.camera.top = 10;
 dirLight.shadow.camera.bottom = -10;
 dirLight.shadow.bias = -0.001;
 scene.add(dirLight);
-scene.add(new THREE.HemisphereLight(0x88aacc, 0x443322, 0.5));
+const hemiLight = new THREE.HemisphereLight(0x88aacc, 0x443322, 0.5);
+scene.add(hemiLight);
+// Lights must cover every layer used by renderable objects, otherwise meshes
+// on layers 1 (dog) / 2 (Go1) would go unlit / drop shadows.
+ambientLight.layers.enableAll();
+dirLight.layers.enableAll();
+hemiLight.layers.enableAll();
 
 const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(60, 60),
@@ -131,6 +160,10 @@ scene.add(grid);
 const debugGroup = new THREE.Group();
 debugGroup.renderOrder = 999;
 scene.add(debugGroup);
+
+function assignLayer(root, layer) {
+    root.traverse((obj) => obj.layers.set(layer));
+}
 
 const AXIS_LEN = 0.5;
 const axisX = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(), AXIS_LEN, 0xff3333, 0.12, 0.06);
@@ -191,6 +224,10 @@ for (let i = 0; i < DEMO.contactCount; i++) {
 
 let jointSpheres = [];
 
+// Debug/trajectory visualizations all pertain to MANN output — restrict to
+// the dog layer so the Go1 viewport stays uncluttered.
+assignLayer(debugGroup, LAYER_DOG);
+
 new GLTFLoader().load(
     DEMO.modelPath,
     (gltf) => {
@@ -210,6 +247,7 @@ new GLTFLoader().load(
                 child.matrixWorldAutoUpdate = false;
             }
         });
+        assignLayer(model, LAYER_DOG);
         scene.add(model);
         connectWebSocket();
     },
@@ -236,7 +274,6 @@ scene.add(go1Group);
 
 const go1Nodes = {};   // link name -> THREE.Group (joint origin)
 let go1Ready = false;
-let go1Enabled = false;
 
 // Kinematic chain mirrors assets/unitree_go1/go1.xml. meshQuat is MuJoCo
 // convention (w, x, y, z); null = identity.
@@ -292,6 +329,7 @@ async function buildGo1Rig() {
         }
         go1Nodes[link.name] = node;
     }
+    assignLayer(go1Group, LAYER_GO1);
     go1Ready = true;
 }
 buildGo1Rig().catch((e) => console.error("[go1] rig build failed:", e));
@@ -454,6 +492,28 @@ function setDebugEnabled(value) {
     }
 }
 
+function setViewMode(mode) {
+    if (!VIEW_MODES.includes(mode)) return;
+    // Go1 / Split only make sense once the server exposes a MuJoCo sim.
+    if (!go1Available && mode !== "dog") return;
+    if (viewMode === mode) return;
+    viewMode = mode;
+    for (const btn of document.querySelectorAll(".view-btn")) {
+        btn.classList.toggle("active", btn.dataset.mode === mode);
+    }
+    const isSplit = mode === "split";
+    const divider = document.getElementById("split-divider");
+    const labelL = document.getElementById("split-label-left");
+    const labelR = document.getElementById("split-label-right");
+    if (divider) divider.classList.toggle("hidden", !isSplit);
+    if (labelL) labelL.classList.toggle("hidden", !isSplit);
+    if (labelR) labelR.classList.toggle("hidden", !isSplit);
+}
+
+for (const btn of document.querySelectorAll(".view-btn")) {
+    btn.addEventListener("click", () => setViewMode(btn.dataset.mode));
+}
+
 function updateSpeedBar(speedValue) {
     const speed = THREE.MathUtils.clamp(speedValue || 0, 0, MAX_CHARACTER_SPEED);
     const fill = document.getElementById("speed-bar-fill");
@@ -466,6 +526,11 @@ function updateSpeedOverlayPosition() {
     if (IS_TOUCH_MOBILE) return;
     const overlay = document.getElementById("speed-overlay");
     if (!overlay) return;
+    // Speed bar tracks MANN's intent — only meaningful in dog view.
+    if (viewMode !== "dog") {
+        overlay.classList.add("hidden");
+        return;
+    }
     const worldPos = currentRootPos.clone();
     worldPos.y += 1.35;
     worldPos.project(camera);
@@ -703,10 +768,12 @@ function connectWebSocket() {
                     if (msg.avgInferenceMs != null) avgInferenceMs = msg.avgInferenceMs;
                     if (msg.remainingSeconds !== undefined) updateTimerDisplay(msg.remainingSeconds);
                     { const el = document.getElementById("perf-display"); if (el) el.classList.remove("hidden"); }
-                    // Show Go1 toggle if the server reports a live MuJoCo sim
+                    // Show the view-mode switcher (Dog / Go1 / Split) if the
+                    // server reports a live MuJoCo sim.
                     if (msg.go1Available) {
-                        const tog = document.getElementById("go1-toggle-row");
-                        if (tog) tog.classList.remove("hidden");
+                        go1Available = true;
+                        const row = document.getElementById("view-mode-row");
+                        if (row) row.classList.remove("hidden");
                     }
                     break;
                 case "time_update":
@@ -740,24 +807,81 @@ function connectWebSocket() {
     };
 }
 
-function updateCamera() {
+const _tmpCamTarget = new THREE.Vector3();
+const _tmpCamPos = new THREE.Vector3();
+
+function updateCameraForSubject(cam, subject, smoothedTarget, smoothedPos, blend) {
+    _tmpCamTarget.set(subject.x, subject.y + CAM_TARGET_HEIGHT, subject.z);
+    _tmpCamPos.set(
+        subject.x + cameraDistance * Math.cos(cameraPhi) * Math.sin(cameraTheta),
+        subject.y + CAM_SELF_HEIGHT + cameraDistance * Math.sin(cameraPhi),
+        subject.z + cameraDistance * Math.cos(cameraPhi) * Math.cos(cameraTheta)
+    );
+    smoothedTarget.lerp(_tmpCamTarget, blend);
+    smoothedPos.lerp(_tmpCamPos, blend);
+    cam.position.copy(smoothedPos);
+    cam.lookAt(smoothedTarget);
+}
+
+function updateCameras() {
     const now = performance.now();
     const dt = Math.min((now - lastFrameTime) / 1000, 0.1);
     lastFrameTime = now;
     const blend = 1.0 - Math.exp(-CAM_SMOOTHING * dt);
-    const desiredTarget = new THREE.Vector3(currentRootPos.x, currentRootPos.y + CAM_TARGET_HEIGHT, currentRootPos.z);
-    const desiredPos = new THREE.Vector3(
-        currentRootPos.x + cameraDistance * Math.cos(cameraPhi) * Math.sin(cameraTheta),
-        currentRootPos.y + CAM_SELF_HEIGHT + cameraDistance * Math.sin(cameraPhi),
-        currentRootPos.z + cameraDistance * Math.cos(cameraPhi) * Math.cos(cameraTheta)
-    );
-    cameraTarget.lerp(desiredTarget, blend);
-    cameraPos.lerp(desiredPos, blend);
-    camera.position.copy(cameraPos);
-    camera.lookAt(cameraTarget);
+
+    updateCameraForSubject(camera, currentRootPos, dogCamTarget, dogCamPos, blend);
+    // In dog-only mode the Go1 rig is not rendered, but keep its smoothed
+    // state warm so switching modes doesn't snap.
+    updateCameraForSubject(go1Camera, go1CurrentRootPos, go1CamTarget, go1CamPos, blend);
+
     dirLight.position.set(currentRootPos.x + 5, 12, currentRootPos.z + 5);
     dirLight.target.position.copy(currentRootPos);
     dirLight.target.updateMatrixWorld();
+}
+
+function renderView() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+
+    if (viewMode === "dog") {
+        renderer.setScissorTest(false);
+        renderer.setViewport(0, 0, w, h);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.render(scene, camera);
+        return;
+    }
+
+    if (viewMode === "go1") {
+        renderer.setScissorTest(false);
+        renderer.setViewport(0, 0, w, h);
+        go1Camera.aspect = w / h;
+        go1Camera.updateProjectionMatrix();
+        renderer.render(scene, go1Camera);
+        return;
+    }
+
+    // Split: left = MANN dog, right = Go1 physics. Scissor ensures each
+    // render's clear stays in its half so we don't wipe the other side.
+    const halfW = Math.floor(w / 2);
+    const rightW = w - halfW;
+
+    renderer.setScissorTest(true);
+
+    renderer.setViewport(0, 0, halfW, h);
+    renderer.setScissor(0, 0, halfW, h);
+    camera.aspect = halfW / h;
+    camera.updateProjectionMatrix();
+    renderer.render(scene, camera);
+
+    renderer.setViewport(halfW, 0, rightW, h);
+    renderer.setScissor(halfW, 0, rightW, h);
+    go1Camera.aspect = rightW / h;
+    go1Camera.updateProjectionMatrix();
+    renderer.render(scene, go1Camera);
+
+    renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, w, h);
 }
 
 function magnitude2(v) {
@@ -830,7 +954,7 @@ function getGamepadInput(gp) {
         action_sit: mapped.rb,
         action_stand: mapped.lb,
         action_lie: mapped.l2,
-        go1_enabled: go1Enabled,
+        go1_enabled: viewMode !== "dog",
     };
 }
 
@@ -860,7 +984,7 @@ function getKeyboardInput() {
         action_sit: !!keys["KeyR"],
         action_stand: !!keys["KeyT"],
         action_lie: !!keys["KeyV"],
-        go1_enabled: go1Enabled,
+        go1_enabled: viewMode !== "dog",
     };
 }
 
@@ -879,7 +1003,7 @@ function getTouchInput() {
         action_sit: false,
         action_stand: false,
         action_lie: false,
-        go1_enabled: go1Enabled,
+        go1_enabled: viewMode !== "dog",
     };
 }
 
@@ -910,6 +1034,7 @@ function createJointSpheres() {
         jointSpheres.push(sphere);
         debugGroup.add(sphere);
     }
+    assignLayer(debugGroup, LAYER_DOG);
 }
 
 function renderFrame(alpha) {
@@ -920,13 +1045,16 @@ function renderFrame(alpha) {
         : (frameCurr.speed || 0);
     updateSpeedBar(currentSpeed);
 
-    // Live Go1 rig: server appends physics state to the frame when the toggle
-    // is on. We show/hide the rig based on whether we actually got go1 data
-    // this frame, not just the user toggle — first frames after enabling are
-    // still dog-only until the puppeteer warmup completes server-side.
+    // Live Go1 rig: server appends physics state to the frame when Go1 is
+    // enabled. Keep the rig hidden until the first frame arrives so the Go1
+    // viewport doesn't flash a T-pose during puppeteer warmup.
     if (frameCurr.go1) {
         if (!go1Group.visible) go1Group.visible = true;
         updateGo1Pose(frameCurr.go1);
+        // MuJoCo Z-up → world Y-up via go1Group's -90° rotation about X:
+        // (x, y, z)_mujoco  →  (x, z, -y)_world.
+        const [rx, ry, rz] = frameCurr.go1.rootPos;
+        go1CurrentRootPos.set(rx, rz, -ry);
     } else if (go1Group.visible) {
         go1Group.visible = false;
     }
@@ -1035,10 +1163,10 @@ function animate(timestamp) {
 
     renderFrameCount++;
     renderFrame(getInterpolationAlpha(timestamp));
-    updateCamera();
+    updateCameras();
     updateSpeedOverlayPosition();
     updateFpsDisplay();
-    renderer.render(scene, camera);
+    renderView();
     sendInput(timestamp);
 }
 
@@ -1059,6 +1187,9 @@ document.addEventListener("keydown", (e) => {
         meshVisible = !meshVisible;
         if (skinnedMesh) skinnedMesh.visible = meshVisible;
     }
+    if (e.code === "Digit1") setViewMode("dog");
+    else if (e.code === "Digit2") setViewMode("go1");
+    else if (e.code === "Digit3") setViewMode("split");
 });
 document.addEventListener("keyup", (e) => {
     keys[e.code] = false;
@@ -1172,13 +1303,6 @@ if ("ontouchstart" in window || navigator.maxTouchPoints > 0) {
         debugBtnMobile.addEventListener("click", () => setDebugEnabled(!debugEnabled));
     }
 
-    const go1Checkbox = document.getElementById("go1-toggle");
-    if (go1Checkbox) {
-        go1Checkbox.addEventListener("change", (e) => {
-            go1Enabled = !!e.target.checked;
-        });
-    }
-
     if (sprintBtnMobile) {
         const setSprintButtonState = (active) => {
             sprintTouchActive = active;
@@ -1206,7 +1330,7 @@ requestAnimationFrame(() => refreshInputDeviceHud());
 animate(0);
 
 window.addEventListener("resize", () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
+    // Per-camera aspect is set inside renderView() based on the active
+    // viewport width, so we just resize the backing buffer here.
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
