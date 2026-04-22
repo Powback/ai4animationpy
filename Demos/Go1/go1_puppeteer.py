@@ -54,6 +54,21 @@ L_CALF = 0.213
 CONTROL_DT = 1.0 / 30.0
 SUBSTEPS_DEFAULT = int(os.environ.get("GO1_SUBSTEPS", "10"))
 
+# Per-joint integral correction: drives actual qpos toward the commanded
+# reference by accumulating tracking error each frame. Different gains per
+# joint type because hips (abduction) have different dynamics from the
+# sagittal thigh/calf chain. Anti-windup via clipping the integral term.
+KI_HIP_DEFAULT = float(os.environ.get("GO1_KI_HIP", "0.0"))
+KI_THIGH_DEFAULT = float(os.environ.get("GO1_KI_THIGH", "1.5"))
+KI_CALF_DEFAULT = float(os.environ.get("GO1_KI_CALF", "1.5"))
+INTEGRAL_LIMIT_DEFAULT = float(os.environ.get("GO1_INTEGRAL_LIMIT", "0.3"))
+KI_PER_JOINT_DEFAULT = np.array([
+    KI_HIP_DEFAULT, KI_THIGH_DEFAULT, KI_CALF_DEFAULT,  # FR
+    KI_HIP_DEFAULT, KI_THIGH_DEFAULT, KI_CALF_DEFAULT,  # FL
+    KI_HIP_DEFAULT, KI_THIGH_DEFAULT, KI_CALF_DEFAULT,  # RR
+    KI_HIP_DEFAULT, KI_THIGH_DEFAULT, KI_CALF_DEFAULT,  # RL
+], dtype=np.float32)
+
 # Legs in Go1 ctrl order: (label, MANN hip bone, MANN foot bone, side_y)
 LEG_MAP = [
     ("FR", "RightShoulder", "RightHand", -1),
@@ -185,7 +200,9 @@ class Go1Puppeteer:
     def __init__(self, sweep_gain: float = 1.5, zero_abduction: bool = True,
                  foot_drop_m: float = 0.0, warmup_frames: int = 20,
                  blend_frames: int = 30, smooth_alpha: float = 0.5,
-                 substeps: int | None = None):
+                 substeps: int | None = None,
+                 ki_per_joint: np.ndarray | None = None,
+                 integral_limit: float | None = None):
         self.enabled = _HAS_MUJOCO
         self.sweep_gain = sweep_gain
         self.zero_abduction = zero_abduction
@@ -197,6 +214,17 @@ class Go1Puppeteer:
         self._frame_idx = 0
         self._smoothed = HOME_CTRL.copy()
         self._fell = False
+
+        self.ki_per_joint = (
+            KI_PER_JOINT_DEFAULT.copy() if ki_per_joint is None
+            else np.asarray(ki_per_joint, dtype=np.float32).copy()
+        )
+        self.integral_limit = (
+            INTEGRAL_LIMIT_DEFAULT if integral_limit is None
+            else float(integral_limit)
+        )
+        self._integral = np.zeros(12, dtype=np.float32)
+        self._last_error = np.zeros(12, dtype=np.float32)
 
         self.model = None
         self.data = None
@@ -222,6 +250,8 @@ class Go1Puppeteer:
         self._frame_idx = 0
         self._smoothed = HOME_CTRL.copy()
         self._fell = False
+        self._integral[:] = 0.0
+        self._last_error[:] = 0.0
 
     def reset(self) -> None:
         self._reset()
@@ -237,6 +267,7 @@ class Go1Puppeteer:
             if self._scale is None and self._frame_idx >= self.warmup_frames:
                 self._scale = compute_scale(name_to_pos)
 
+            w = 0.0
             if self._scale is None:
                 target = HOME_CTRL.copy()
             else:
@@ -254,12 +285,31 @@ class Go1Puppeteer:
                 (1 - self.smooth_alpha) * self._smoothed
                 + self.smooth_alpha * target
             )
+
+            # Integral correction is added to the reference sent to the PD
+            # controller. It only accumulates once the blend to MANN targets
+            # has completed — during warmup+blend the reference is still
+            # slewing from HOME, and any error there is expected (not bias).
+            commanded = self._smoothed + self._integral
             self.data.ctrl[:] = np.clip(
-                self._smoothed.astype(np.float64),
+                commanded.astype(np.float64),
                 JOINT_RANGES[:, 0], JOINT_RANGES[:, 1],
             )
             for _ in range(self.substeps):
                 mujoco.mj_step(self.model, self.data)
+
+            # Measure tracking error after physics advanced by CONTROL_DT,
+            # then integrate with anti-windup clipping. Only when blend
+            # completed so we're tracking MANN, not the HOME→MANN slew.
+            actual = self.data.qpos[7:19].astype(np.float32)
+            self._last_error = self._smoothed - actual
+            if w >= 1.0:
+                self._integral = np.clip(
+                    self._integral + self._last_error
+                    * self.ki_per_joint * CONTROL_DT,
+                    -self.integral_limit,
+                    self.integral_limit,
+                )
 
             # Detect fall — terminates further stepping so the robot rests
             # on the ground (visual) instead of flailing.
@@ -287,3 +337,11 @@ class Go1Puppeteer:
 
     def has_fallen(self) -> bool:
         return self._fell
+
+    def tracking_error(self) -> np.ndarray:
+        """Return (12,) per-joint (reference - actual) from the last step."""
+        return self._last_error.copy()
+
+    def integral(self) -> np.ndarray:
+        """Return (12,) accumulated integral correction in actuator order."""
+        return self._integral.copy()
