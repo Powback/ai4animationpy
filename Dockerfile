@@ -45,6 +45,10 @@ COPY Demos/Locomotion/Quadruped/LegIK.py        Demos/Locomotion/Quadruped/LegIK
 COPY Demos/Locomotion/Quadruped/Sequence.py     Demos/Locomotion/Quadruped/Sequence.py
 COPY Demos/Locomotion/Quadruped/WebProgram.py   Demos/Locomotion/Quadruped/WebProgram.py
 
+# Go1 physics puppeteer: MuJoCo model + STL meshes + retarget helper.
+# The quadruped WebProgram imports go1_puppeteer.py at startup.
+COPY Demos/Go1/                                 Demos/Go1/
+
 # Web demo source + client
 COPY Demos/run.py Demos/run.py
 COPY Demos/server.py Demos/server.py

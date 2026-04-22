@@ -8,6 +8,8 @@ services:
       - 1.1.1.1
     container_name: ai4anim
     restart: unless-stopped
+    ports:
+      - "7860:7860"
     environment:
       - NO_BROWSER=1
       - PORT=7860

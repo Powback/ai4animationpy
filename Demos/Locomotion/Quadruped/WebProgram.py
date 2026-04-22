@@ -33,6 +33,17 @@ from ai4animation import (
 from LegIK import LegIK
 from Sequence import Sequence
 
+# Go1 puppeteer lives in Demos/Go1/; path added explicitly.
+_GO1_DIR = SCRIPT_DIR.parent.parent / "Go1"
+sys.path.insert(0, str(_GO1_DIR))
+try:
+    from go1_puppeteer import Go1Puppeteer  # type: ignore
+    _HAS_GO1 = True
+except Exception as _e:  # pragma: no cover — safe fallback if mujoco missing
+    print(f"[WebProgram] Go1 puppeteer unavailable: {_e}")
+    Go1Puppeteer = None  # type: ignore
+    _HAS_GO1 = False
+
 MIN_TIMESCALE = 1.0
 MAX_TIMESCALE = 1.5
 SYNCHRONIZATION_SENSITIVITY = 5
@@ -72,6 +83,17 @@ class WebProgram:
         self.action_sit = False
         self.action_stand = False
         self.action_lie = False
+        self.go1_enabled_input = False
+
+        # Live MuJoCo Go1 sim fed from MANN skeleton each tick. See
+        # Demos/Go1/go1_puppeteer.py for the retarget logic.
+        self.Go1 = None
+        if _HAS_GO1:
+            try:
+                self.Go1 = Go1Puppeteer()
+            except Exception as e:  # pragma: no cover
+                print(f"[WebProgram] Go1Puppeteer construct failed: {e}")
+                self.Go1 = None
 
     def Start(self):
         self.Actor = AI4Animation.Scene.AddEntity("Actor_Dog").AddComponent(
@@ -179,6 +201,7 @@ class WebProgram:
         self.action_sit = bool(inp.get("action_sit", False))
         self.action_stand = bool(inp.get("action_stand", False))
         self.action_lie = bool(inp.get("action_lie", False))
+        self.go1_enabled_input = bool(inp.get("go1_enabled", False))
 
     def _select_locomotion_mode_keyboard(self):
         if self.walk_modifier:
@@ -212,6 +235,46 @@ class WebProgram:
             self.Timestamp = Time.TotalTime
             self.Predict()
         self.Animate()
+        self._StepGo1IfEnabled()
+
+    # 21 MANN bones consumed by the Go1 retargeter. Order does not matter
+    # because the retargeter reads a name→position dict.
+    _GO1_BONES = (
+        "Hips", "Spine1",
+        "LeftShoulder", "LeftForeArm", "LeftHand",
+        "RightShoulder", "RightForeArm", "RightHand",
+        "LeftUpLeg", "LeftLeg", "LeftFoot",
+        "RightUpLeg", "RightLeg", "RightFoot",
+    )
+
+    def _StepGo1IfEnabled(self):
+        if self.Go1 is None or not getattr(self, "go1_enabled_input", False):
+            return
+        try:
+            name_to_pos = {
+                n: np.asarray(self.Actor.GetBone(n).GetPosition(),
+                              dtype=np.float32)
+                for n in self._GO1_BONES
+            }
+        except Exception:
+            return
+        self.Go1.step(name_to_pos)
+
+    def Go1Active(self) -> bool:
+        """Return True iff a live Go1 frame is available this tick."""
+        return (
+            self.Go1 is not None
+            and self.Go1.enabled
+            and getattr(self, "go1_enabled_input", False)
+        )
+
+    def Go1RootQpos(self):
+        """Return (root7, qpos12) arrays. Zeros if inactive."""
+        if self.Go1 is None:
+            z7 = np.zeros(7, dtype=np.float32)
+            z12 = np.zeros(12, dtype=np.float32)
+            return z7, z12
+        return self.Go1.root_pose(), self.Go1.joint_qpos()
 
     def Control(self):
         current_speed = self.GetCurrentSpeed()

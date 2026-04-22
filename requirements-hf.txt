@@ -10,3 +10,5 @@ pyyaml
 matplotlib
 scikit-learn
 onnxruntime
+# Physics-valid Go1 rendering driven by live MANN (Demos/Go1/go1_puppeteer.py)
+mujoco>=3.2,<4

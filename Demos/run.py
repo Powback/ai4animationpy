@@ -22,7 +22,10 @@ from fastapi.staticfiles import StaticFiles
 CLIENT_DIR = str(SCRIPT_DIR / "client")
 ASSETS_BIPED_DIR = str(SCRIPT_DIR / "_ASSETS_" / "Geno")
 ASSETS_QUADRUPED_DIR = str(SCRIPT_DIR / "_ASSETS_" / "Quadruped")
+ASSETS_GO1_DIR = str(SCRIPT_DIR / "Go1" / "assets")
 app.mount("/assets/quadruped", StaticFiles(directory=ASSETS_QUADRUPED_DIR), name="assets-quadruped")
+if Path(ASSETS_GO1_DIR).exists():
+    app.mount("/assets/go1", StaticFiles(directory=ASSETS_GO1_DIR), name="assets-go1")
 app.mount("/assets", StaticFiles(directory=ASSETS_BIPED_DIR), name="assets")
 app.mount("/", StaticFiles(directory=CLIENT_DIR, html=True), name="client")
 

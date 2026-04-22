@@ -350,6 +350,23 @@ def _pack_frame(program) -> bytes:
     ctrl_traj_dir_f32 = np.asarray(ctrl_traj_dir, dtype=np.float32)
     speed_f32 = np.asarray([current_speed], dtype=np.float32)
 
+    # Go1 payload: [active_flag(1), root_xyz_quat(7), joint_qpos(12)] = 20 f32s.
+    # Always appended so the client can rely on a fixed trailer size. When Go1
+    # is off (default), active_flag=0 and other values are zeros.
+    go1_active = 1.0 if (
+        hasattr(program, "Go1Active") and program.Go1Active()
+    ) else 0.0
+    if go1_active and hasattr(program, "Go1RootQpos"):
+        go1_root, go1_qpos = program.Go1RootQpos()
+    else:
+        go1_root = np.zeros(7, dtype=np.float32)
+        go1_qpos = np.zeros(12, dtype=np.float32)
+    go1_f32 = np.concatenate([
+        np.asarray([go1_active], dtype=np.float32),
+        np.asarray(go1_root, dtype=np.float32).reshape(-1),
+        np.asarray(go1_qpos, dtype=np.float32).reshape(-1),
+    ])
+
     return (
         root_matrix_f32.tobytes()
         + entity_matrices_f32.tobytes()
@@ -359,6 +376,7 @@ def _pack_frame(program) -> bytes:
         + ctrl_traj_pos_f32.tobytes()
         + ctrl_traj_dir_f32.tobytes()
         + speed_f32.tobytes()
+        + go1_f32.tobytes()
     )
 
 
@@ -382,6 +400,8 @@ def _neutralize_input(inp: dict) -> dict:
     neutral["action_sit"] = False
     neutral["action_stand"] = False
     neutral["action_lie"] = False
+    # Preserve go1_enabled across neutralization — it is a UI toggle, not a
+    # motion command that should reset when the user stops driving.
     return neutral
 
 
@@ -428,6 +448,11 @@ async def _run_active_session(websocket: WebSocket, demo_name: str, sid: str):
     with _state_lock:
         remaining = _get_lease_remaining()
 
+    go1_available = bool(
+        hasattr(program, "Go1") and getattr(program, "Go1", None)
+        and getattr(program.Go1, "enabled", False)
+    )
+
     await websocket.send_json({
         "type": "init",
         "styles": program.GuidanceNames,
@@ -437,6 +462,7 @@ async def _run_active_session(websocket: WebSocket, demo_name: str, sid: str):
         "remainingSeconds": remaining,
         "avgInferenceMs": program.AvgInferenceMs,
         "demo": demo_name,
+        "go1Available": go1_available,
     })
 
     disconnected = asyncio.Event()

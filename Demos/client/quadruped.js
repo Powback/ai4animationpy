@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { STLLoader } from "three/addons/loaders/STLLoader.js";
 
 const DEMO = {
     title: "Neural Quadruped Locomotion",
@@ -216,6 +217,102 @@ new GLTFLoader().load(
     (err) => console.error("Failed to load model:", err)
 );
 
+// ── Go1 rig (server-side MuJoCo, client-side FK render) ─────────────────────
+//
+// Frame trailer: go1_active(1) + root(7: xyz+quat) + qpos(12). Root is given
+// in MuJoCo world (Z-up). We put the whole rig under `go1Group` rotated
+// -90° around X so internal coords can stay Z-up while the scene stays Y-up.
+
+const GO1_STL_BASE = "/assets/go1/";
+const go1Material = new THREE.MeshStandardMaterial({
+    color: 0x202025, roughness: 0.45, metalness: 0.65,
+});
+
+const go1Group = new THREE.Group();
+go1Group.name = "go1_root";
+go1Group.rotation.x = -Math.PI / 2;
+go1Group.visible = false;
+scene.add(go1Group);
+
+const go1Nodes = {};   // link name -> THREE.Group (joint origin)
+let go1Ready = false;
+let go1Enabled = false;
+
+// Kinematic chain mirrors assets/unitree_go1/go1.xml. meshQuat is MuJoCo
+// convention (w, x, y, z); null = identity.
+const GO1_CHAIN = [
+    { name: "trunk",    parent: null,       pos: [0, 0, 0],              mesh: "trunk.stl",       meshQuat: null },
+    { name: "FR_hip",   parent: "trunk",    pos: [ 0.1881, -0.04675, 0], mesh: "hip.stl",         meshQuat: null, axis: "x", qIdx: 0 },
+    { name: "FR_thigh", parent: "FR_hip",   pos: [0, -0.08, 0],          mesh: "thigh_mirror.stl", meshQuat: null, axis: "y", qIdx: 1 },
+    { name: "FR_calf",  parent: "FR_thigh", pos: [0, 0, -0.213],         mesh: "calf.stl",        meshQuat: null, axis: "y", qIdx: 2 },
+    { name: "FL_hip",   parent: "trunk",    pos: [ 0.1881,  0.04675, 0], mesh: "hip.stl",         meshQuat: null, axis: "x", qIdx: 3 },
+    { name: "FL_thigh", parent: "FL_hip",   pos: [0,  0.08, 0],          mesh: "thigh.stl",       meshQuat: null, axis: "y", qIdx: 4 },
+    { name: "FL_calf",  parent: "FL_thigh", pos: [0, 0, -0.213],         mesh: "calf.stl",        meshQuat: null, axis: "y", qIdx: 5 },
+    { name: "RR_hip",   parent: "trunk",    pos: [-0.1881, -0.04675, 0], mesh: "hip.stl",         meshQuat: [0, 0, 0, -1], axis: "x", qIdx: 6 },
+    { name: "RR_thigh", parent: "RR_hip",   pos: [0, -0.08, 0],          mesh: "thigh_mirror.stl", meshQuat: null, axis: "y", qIdx: 7 },
+    { name: "RR_calf",  parent: "RR_thigh", pos: [0, 0, -0.213],         mesh: "calf.stl",        meshQuat: null, axis: "y", qIdx: 8 },
+    { name: "RL_hip",   parent: "trunk",    pos: [-0.1881,  0.04675, 0], mesh: "hip.stl",         meshQuat: [0, 0, 1, 0],  axis: "x", qIdx: 9 },
+    { name: "RL_thigh", parent: "RL_hip",   pos: [0,  0.08, 0],          mesh: "thigh.stl",       meshQuat: null, axis: "y", qIdx: 10 },
+    { name: "RL_calf",  parent: "RL_thigh", pos: [0, 0, -0.213],         mesh: "calf.stl",        meshQuat: null, axis: "y", qIdx: 11 },
+];
+
+const stlLoader = new STLLoader();
+const stlCache = {};
+function loadStl(file) {
+    if (stlCache[file]) return Promise.resolve(stlCache[file]);
+    return new Promise((res, rej) => {
+        stlLoader.load(GO1_STL_BASE + file, (geo) => {
+            stlCache[file] = geo;
+            res(geo);
+        }, undefined, rej);
+    });
+}
+
+async function buildGo1Rig() {
+    for (const link of GO1_CHAIN) {
+        const node = new THREE.Group();
+        node.name = "go1_" + link.name;
+        node.position.fromArray(link.pos);
+        try {
+            const geo = await loadStl(link.mesh);
+            const mesh = new THREE.Mesh(geo, go1Material);
+            mesh.castShadow = true;
+            if (link.meshQuat) {
+                const [w, x, y, z] = link.meshQuat;
+                mesh.quaternion.set(x, y, z, w);
+            }
+            node.add(mesh);
+        } catch (err) {
+            console.warn("[go1] STL load failed for", link.mesh, err);
+        }
+        if (link.parent) {
+            go1Nodes[link.parent].add(node);
+        } else {
+            go1Group.add(node);
+        }
+        go1Nodes[link.name] = node;
+    }
+    go1Ready = true;
+}
+buildGo1Rig().catch((e) => console.error("[go1] rig build failed:", e));
+
+function updateGo1Pose(frameGo1) {
+    if (!go1Ready || !go1Nodes.trunk || !frameGo1) return;
+    const [rx, ry, rz] = frameGo1.rootPos;
+    const [qw, qx, qy, qz] = frameGo1.rootQuat;
+    go1Nodes.trunk.position.set(rx, ry, rz);
+    go1Nodes.trunk.quaternion.set(qx, qy, qz, qw);
+    for (const link of GO1_CHAIN) {
+        if (link.qIdx === undefined || !link.axis) continue;
+        const angle = frameGo1.qpos[link.qIdx];
+        const node = go1Nodes[link.name];
+        if (!node) continue;
+        if (link.axis === "x") node.rotation.set(angle, 0, 0);
+        else if (link.axis === "y") node.rotation.set(0, angle, 0);
+        else if (link.axis === "z") node.rotation.set(0, 0, angle);
+    }
+}
+
 function rebuildSkeletonPairs() {
     const boneSet = new Set(entityNames);
     skeletonPairs = [];
@@ -280,7 +377,23 @@ function parseFrame(buffer) {
     }
 
     const speed = offset < floats.length ? floats[offset] : 0.0;
-    return { rootMatrix, entityMatrices, contacts, simTrajectory, simTrajectoryDir, ctrlTrajectory, ctrlTrajectoryDir, speed };
+    offset += 1;
+
+    // Optional Go1 trailer appended by server when MuJoCo sim is active:
+    //   go1_active(1) + go1_root(7: x,y,z,qw,qx,qy,qz) + go1_qpos(12)
+    let go1 = null;
+    if (offset + 20 <= floats.length) {
+        const activeFlag = floats[offset];
+        if (activeFlag >= 0.5) {
+            go1 = {
+                rootPos: [floats[offset + 1], floats[offset + 2], floats[offset + 3]],
+                rootQuat: [floats[offset + 4], floats[offset + 5], floats[offset + 6], floats[offset + 7]],
+                qpos: Array.from(floats.subarray(offset + 8, offset + 20)),
+            };
+        }
+        offset += 20;
+    }
+    return { rootMatrix, entityMatrices, contacts, simTrajectory, simTrajectoryDir, ctrlTrajectory, ctrlTrajectoryDir, speed, go1 };
 }
 
 function interpolateTransform(a, b, alpha, outPos, outQuat, outScale) {
@@ -590,6 +703,11 @@ function connectWebSocket() {
                     if (msg.avgInferenceMs != null) avgInferenceMs = msg.avgInferenceMs;
                     if (msg.remainingSeconds !== undefined) updateTimerDisplay(msg.remainingSeconds);
                     { const el = document.getElementById("perf-display"); if (el) el.classList.remove("hidden"); }
+                    // Show Go1 toggle if the server reports a live MuJoCo sim
+                    if (msg.go1Available) {
+                        const tog = document.getElementById("go1-toggle-row");
+                        if (tog) tog.classList.remove("hidden");
+                    }
                     break;
                 case "time_update":
                     if (msg.remainingSeconds !== undefined) updateTimerDisplay(msg.remainingSeconds);
@@ -712,6 +830,7 @@ function getGamepadInput(gp) {
         action_sit: mapped.rb,
         action_stand: mapped.lb,
         action_lie: mapped.l2,
+        go1_enabled: go1Enabled,
     };
 }
 
@@ -741,6 +860,7 @@ function getKeyboardInput() {
         action_sit: !!keys["KeyR"],
         action_stand: !!keys["KeyT"],
         action_lie: !!keys["KeyV"],
+        go1_enabled: go1Enabled,
     };
 }
 
@@ -759,6 +879,7 @@ function getTouchInput() {
         action_sit: false,
         action_stand: false,
         action_lie: false,
+        go1_enabled: go1Enabled,
     };
 }
 
@@ -798,6 +919,18 @@ function renderFrame(alpha) {
         ? THREE.MathUtils.lerp(framePrev.speed || 0, frameCurr.speed || 0, alpha)
         : (frameCurr.speed || 0);
     updateSpeedBar(currentSpeed);
+
+    // Live Go1 rig: server appends physics state to the frame when the toggle
+    // is on. We show/hide the rig based on whether we actually got go1 data
+    // this frame, not just the user toggle — first frames after enabling are
+    // still dog-only until the puppeteer warmup completes server-side.
+    if (frameCurr.go1) {
+        if (!go1Group.visible) go1Group.visible = true;
+        updateGo1Pose(frameCurr.go1);
+    } else if (go1Group.visible) {
+        go1Group.visible = false;
+    }
+
     if (!debugEnabled) return;
 
     const axisOrigin = _pos.clone();
@@ -1037,6 +1170,13 @@ if ("ontouchstart" in window || navigator.maxTouchPoints > 0) {
 
     if (debugBtnMobile) {
         debugBtnMobile.addEventListener("click", () => setDebugEnabled(!debugEnabled));
+    }
+
+    const go1Checkbox = document.getElementById("go1-toggle");
+    if (go1Checkbox) {
+        go1Checkbox.addEventListener("change", (e) => {
+            go1Enabled = !!e.target.checked;
+        });
     }
 
     if (sprintBtnMobile) {
