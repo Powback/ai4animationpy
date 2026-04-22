@@ -62,8 +62,14 @@ ACTION_TRIGGER_SPEED_MAX = 0.5
 # Each Predict tick the Actor.Root is nudged toward a target root derived
 # from Go1's MuJoCo (x, y, yaw). Setting GAIN=0 disables feedback (open-loop).
 # LAT_SIGN flips MuJoCo-y→dog-z if the demo walks like a crab. Typical good
-# values: GAIN ~ 0.25–0.4.
+# values: POS_GAIN ~ 0.25–0.4.
+#
+# YAW_GAIN is separate from the position gain — pulling MANN back toward Go1's
+# yaw kills turning because the body-frame retarget can't make Go1 actually
+# rotate. Default 0 lets MANN turn freely while position still stays in sync.
+# The reverse (Go1 tracking MANN's yaw) is handled inside Go1Puppeteer.
 CLOSED_LOOP_GAIN = float(os.environ.get("CLOSED_LOOP_GAIN", "0.3"))
+CLOSED_LOOP_YAW_GAIN = float(os.environ.get("CLOSED_LOOP_YAW_GAIN", "0.0"))
 CLOSED_LOOP_LAT_SIGN = float(os.environ.get("CLOSED_LOOP_LAT_SIGN", "1.0"))
 
 LOCOMOTION_MODES = {
@@ -271,7 +277,10 @@ class WebProgram:
             }
         except Exception:
             return
-        self.Go1.step(name_to_pos)
+        # Pass MANN's current root yaw so Go1 can track it. Body-frame
+        # retargeting alone doesn't make the physics body rotate with MANN.
+        mann_yaw = self._mann_root_yaw_rad(self.Actor.Root)
+        self.Go1.step(name_to_pos, mann_yaw_rad=float(mann_yaw))
 
     def Go1Active(self) -> bool:
         """Return True iff a live Go1 frame is available this tick."""
@@ -325,12 +334,13 @@ class WebProgram:
         within the ground-plane invariants MANN actually cares about for
         stride planning.
 
-        Applied as a rigid body-frame lerp against Actor.Root with gain
-        CLOSED_LOOP_GAIN, and the same lerped transform is pushed through
-        Actor.Transforms / Actor.Velocities / SimulationObject.Transforms so
-        the next Control() + Predict() see a consistent world.
+        Position (xy) and yaw use independent gains. Yaw gain defaults to 0 so
+        MANN can turn freely in response to joystick — pulling MANN back to
+        Go1's yaw kills turning because Go1 can't actually rotate from
+        body-frame leg retargeting alone. Go1 tracks MANN's yaw via a separate
+        feedback inside Go1Puppeteer.step().
         """
-        if CLOSED_LOOP_GAIN <= 0.0:
+        if CLOSED_LOOP_GAIN <= 0.0 and CLOSED_LOOP_YAW_GAIN <= 0.0:
             return
         if not self.Go1Active():
             # Reset anchor when Go1 is toggled off, so re-enabling re-captures.
@@ -360,19 +370,30 @@ class WebProgram:
         dx_mann = d_fwd * fwd_x + d_lat * right_x
         dz_mann = d_fwd * fwd_z + d_lat * right_z
 
+        old_root = self.Actor.Root.copy()
+        cur_pos = np.asarray(Transform.GetPosition(old_root),
+                             dtype=np.float32).copy()
+        cur_yaw = self._mann_root_yaw_rad(old_root)
+
+        # Separate lerps for position and yaw — applying position and yaw
+        # together would require a single rigid transform, but that forces the
+        # same gain on both. We build target position and target yaw from
+        # anchor + Go1 delta, lerp each independently, then assemble.
         target_pos = anc["mann_pos"].copy()
         target_pos[0] += dx_mann
         target_pos[2] += dz_mann
-        # Leave y (height) alone — preserves whatever height MANN is at.
-        target_pos[1] = float(Transform.GetPosition(self.Actor.Root)[1])
+        target_pos[1] = float(cur_pos[1])  # preserve height
 
-        target_yaw_rad = anc["mann_yaw"] + (go1_yaw - anc["go1_yaw"])
-        target_yaw_deg = np.degrees(np.asarray(target_yaw_rad, dtype=np.float32))
-        target_rot = Rotation.RotationY(target_yaw_deg)
-        target_root = Transform.TR(target_pos, target_rot)
+        target_yaw = anc["mann_yaw"] + (go1_yaw - anc["go1_yaw"])
 
-        old_root = self.Actor.Root.copy()
-        new_root = Transform.Interpolate(old_root, target_root, CLOSED_LOOP_GAIN)
+        new_pos = cur_pos + CLOSED_LOOP_GAIN * (target_pos - cur_pos)
+        # Wrap yaw error into (-pi, pi] before lerping so we take the short way.
+        yaw_err = float(
+            (target_yaw - cur_yaw + np.pi) % (2 * np.pi) - np.pi
+        )
+        new_yaw = cur_yaw + CLOSED_LOOP_YAW_GAIN * yaw_err
+        new_yaw_deg = np.asarray(np.degrees(new_yaw), dtype=np.float32)
+        new_root = Transform.TR(new_pos, Rotation.RotationY(new_yaw_deg))
 
         # Shift Actor's bones + velocities + SimulationObject's root series so
         # the whole world rotates/translates rigidly by (new_root · old_root⁻¹).

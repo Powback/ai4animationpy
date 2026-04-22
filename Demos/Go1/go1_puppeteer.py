@@ -62,6 +62,14 @@ KI_HIP_DEFAULT = float(os.environ.get("GO1_KI_HIP", "0.0"))
 KI_THIGH_DEFAULT = float(os.environ.get("GO1_KI_THIGH", "1.5"))
 KI_CALF_DEFAULT = float(os.environ.get("GO1_KI_CALF", "1.5"))
 INTEGRAL_LIMIT_DEFAULT = float(os.environ.get("GO1_INTEGRAL_LIMIT", "0.3"))
+
+# Yaw-tracking feedback: when the caller passes a MANN target yaw to step(),
+# we drive Go1's base angular velocity about +Z (qvel[5]) toward it. The
+# body-frame leg retarget doesn't convey MANN's world yaw, so without this
+# Go1 keeps facing its initial heading while MANN turns. KP is rad/s per
+# rad of yaw error, capped at MAX (rad/s) to avoid snappy over-rotation.
+YAW_FEEDBACK_KP_DEFAULT = float(os.environ.get("GO1_YAW_FEEDBACK_KP", "4.0"))
+YAW_FEEDBACK_MAX_DEFAULT = float(os.environ.get("GO1_YAW_FEEDBACK_MAX", "3.0"))
 KI_PER_JOINT_DEFAULT = np.array([
     KI_HIP_DEFAULT, KI_THIGH_DEFAULT, KI_CALF_DEFAULT,  # FR
     KI_HIP_DEFAULT, KI_THIGH_DEFAULT, KI_CALF_DEFAULT,  # FL
@@ -202,7 +210,9 @@ class Go1Puppeteer:
                  blend_frames: int = 30, smooth_alpha: float = 0.5,
                  substeps: int | None = None,
                  ki_per_joint: np.ndarray | None = None,
-                 integral_limit: float | None = None):
+                 integral_limit: float | None = None,
+                 yaw_feedback_kp: float | None = None,
+                 yaw_feedback_max: float | None = None):
         self.enabled = _HAS_MUJOCO
         self.sweep_gain = sweep_gain
         self.zero_abduction = zero_abduction
@@ -225,6 +235,16 @@ class Go1Puppeteer:
         )
         self._integral = np.zeros(12, dtype=np.float32)
         self._last_error = np.zeros(12, dtype=np.float32)
+
+        self.yaw_feedback_kp = (
+            YAW_FEEDBACK_KP_DEFAULT if yaw_feedback_kp is None
+            else float(yaw_feedback_kp)
+        )
+        self.yaw_feedback_max = (
+            YAW_FEEDBACK_MAX_DEFAULT if yaw_feedback_max is None
+            else float(yaw_feedback_max)
+        )
+        self._last_yaw_err = 0.0
 
         self.model = None
         self.data = None
@@ -256,8 +276,23 @@ class Go1Puppeteer:
     def reset(self) -> None:
         self._reset()
 
-    def step(self, name_to_pos: dict[str, np.ndarray]) -> None:
-        """Retarget one MANN frame to Go1 PD ctrl and step physics."""
+    @staticmethod
+    def _quat_yaw_rad(quat_wxyz) -> float:
+        """Yaw (rad) about MuJoCo +Z from a world-from-body quaternion."""
+        w, x, y, z = (float(v) for v in quat_wxyz)
+        fx = 1.0 - 2.0 * (y * y + z * z)
+        fy = 2.0 * (x * y + w * z)
+        return float(np.arctan2(fy, fx))
+
+    def step(self, name_to_pos: dict[str, np.ndarray],
+             mann_yaw_rad: float | None = None) -> None:
+        """Retarget one MANN frame to Go1 PD ctrl and step physics.
+
+        When mann_yaw_rad is supplied, the base angular velocity about +Z is
+        driven toward (mann_yaw_rad - go1_yaw) * yaw_feedback_kp, clamped to
+        ±yaw_feedback_max. This is what makes Go1 track MANN's turning —
+        body-frame leg retargeting alone is yaw-invariant.
+        """
         if not self.enabled:
             return
         if self._fell:
@@ -295,6 +330,33 @@ class Go1Puppeteer:
                 commanded.astype(np.float64),
                 JOINT_RANGES[:, 0], JOINT_RANGES[:, 1],
             )
+
+            # Yaw tracking: override base angular velocity about world +Z.
+            # Applied only after the home→MANN blend has completed so the
+            # robot doesn't spin during stand-up. qvel[5] is the base's
+            # z-axis angular velocity for a free joint in MuJoCo.
+            apply_yaw = (
+                mann_yaw_rad is not None
+                and self.yaw_feedback_kp > 0.0
+                and w >= 1.0
+            )
+            if apply_yaw:
+                go1_yaw = self._quat_yaw_rad(self.data.qpos[3:7])
+                err = float(mann_yaw_rad) - go1_yaw
+                # Wrap to (-pi, pi] so we always turn the short way.
+                err = float((err + np.pi) % (2 * np.pi) - np.pi)
+                self._last_yaw_err = err
+                wz = float(np.clip(
+                    err * self.yaw_feedback_kp,
+                    -self.yaw_feedback_max, self.yaw_feedback_max,
+                ))
+                self.data.qvel[5] = wz
+
+            # Apply the yaw kick once before the substep loop — letting
+            # physics integrate contact forces across substeps keeps feet
+            # planted instead of dragging them along a forced angular rate.
+            # Hard-overriding qvel[5] every substep felt aggressive: it
+            # kept overshooting and the body wobbled tall↔short.
             for _ in range(self.substeps):
                 mujoco.mj_step(self.model, self.data)
 

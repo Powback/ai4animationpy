@@ -19,12 +19,30 @@ services:
       - MKL_NUM_THREADS=8
       - TORCH_NUM_THREADS=8
       - CLOSED_LOOP_GAIN=${CLOSED_LOOP_GAIN:-0.3}
+      # Yaw gain kept at 0 so MANN can turn freely in response to joystick.
+      # Go1 tracks MANN's yaw via GO1_YAW_FEEDBACK_KP below, not the other
+      # way around. Setting this >0 would pull MANN back to Go1's yaw and
+      # dampen turn response.
+      - CLOSED_LOOP_YAW_GAIN=${CLOSED_LOOP_YAW_GAIN:-0.0}
       - CLOSED_LOOP_LAT_SIGN=${CLOSED_LOOP_LAT_SIGN:-1.0}
-      - GO1_SUBSTEPS=${GO1_SUBSTEPS:-30}
+      # kp=100 PD needs no integral trim — leaving KI>0 persistently pushes
+      # against the natural gait and the robot looks "weak". The integral was
+      # tuned against the kp=400 overshoot regime.
+      # 60 substeps/MANN-frame = 0.555ms timestep, matches spec-llm
+      # mann_live_go1.py (the clip that's been confirmed to walk cleanly).
+      # At 30 substeps (1.1ms) the elliptic friction cone + impratio=100
+      # under-resolves foot contact and the robot feels "weak".
+      - GO1_SUBSTEPS=${GO1_SUBSTEPS:-60}
       - GO1_KI_HIP=${GO1_KI_HIP:-0.0}
-      - GO1_KI_THIGH=${GO1_KI_THIGH:-1.5}
-      - GO1_KI_CALF=${GO1_KI_CALF:-1.5}
+      - GO1_KI_THIGH=${GO1_KI_THIGH:-0.0}
+      - GO1_KI_CALF=${GO1_KI_CALF:-0.0}
       - GO1_INTEGRAL_LIMIT=${GO1_INTEGRAL_LIMIT:-0.3}
+      # Yaw feedback: drives Go1 base angular velocity (qvel[5]) toward
+      # MANN's yaw each step. KP=rad/s per rad of error, MAX caps rate.
+      # Without this, body-frame leg retargeting is yaw-invariant and Go1
+      # never rotates — so turning joystick input does nothing on Go1.
+      - GO1_YAW_FEEDBACK_KP=${GO1_YAW_FEEDBACK_KP:-4.0}
+      - GO1_YAW_FEEDBACK_MAX=${GO1_YAW_FEEDBACK_MAX:-3.0}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.ai4anim.rule=Host(`ai4anim.pow`)"
