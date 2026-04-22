@@ -18,6 +18,9 @@ services:
       - OMP_NUM_THREADS=8
       - MKL_NUM_THREADS=8
       - TORCH_NUM_THREADS=8
+      - CLOSED_LOOP_GAIN=${CLOSED_LOOP_GAIN:-0.3}
+      - CLOSED_LOOP_LAT_SIGN=${CLOSED_LOOP_LAT_SIGN:-1.0}
+      - GO1_SUBSTEPS=${GO1_SUBSTEPS:-30}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.ai4anim.rule=Host(`ai4anim.pow`)"

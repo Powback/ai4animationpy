@@ -58,6 +58,14 @@ CONTACT_THRESHOLD = 2.0 / 3.0
 INPUT_DEADZONE = 0.25
 ACTION_TRIGGER_SPEED_MAX = 0.5
 
+# Closed-loop feedback from Go1 physics back into MANN's root.
+# Each Predict tick the Actor.Root is nudged toward a target root derived
+# from Go1's MuJoCo (x, y, yaw). Setting GAIN=0 disables feedback (open-loop).
+# LAT_SIGN flips MuJoCo-y→dog-z if the demo walks like a crab. Typical good
+# values: GAIN ~ 0.25–0.4.
+CLOSED_LOOP_GAIN = float(os.environ.get("CLOSED_LOOP_GAIN", "0.3"))
+CLOSED_LOOP_LAT_SIGN = float(os.environ.get("CLOSED_LOOP_LAT_SIGN", "1.0"))
+
 LOCOMOTION_MODES = {
     "walk": 0.7,
     "pace": 1.2,
@@ -189,6 +197,10 @@ class WebProgram:
         self._noise_buf = Tensor.ToDevice(torch.empty(1, self.Model.LatentDim))
         self._seed_buf = Tensor.ToDevice(torch.zeros(1, self.Model.LatentDim))
 
+        # Closed-loop anchor state — captured on the first Go1-active tick.
+        # See _ApplyClosedLoopCorrection below.
+        self._cl_anchor = None
+
         self.Timestamp = Time.TotalTime
         self._ready = True
 
@@ -233,6 +245,7 @@ class WebProgram:
             or Time.TotalTime - self.Timestamp > 1.0 / PREDICTION_FPS
         ):
             self.Timestamp = Time.TotalTime
+            self._ApplyClosedLoopCorrection()
             self.Predict()
         self.Animate()
         self._StepGo1IfEnabled()
@@ -267,6 +280,115 @@ class WebProgram:
             and self.Go1.enabled
             and getattr(self, "go1_enabled_input", False)
         )
+
+    @staticmethod
+    def _mann_root_yaw_rad(root):
+        """Yaw (rad) of a MANN 4x4 root about y-up, derived from its +Z axis."""
+        axis_z = np.asarray(root[:3, 2], dtype=np.float32)
+        return float(np.arctan2(axis_z[0], axis_z[2]))
+
+    @staticmethod
+    def _quat_yaw_rad(quat_wxyz):
+        """Yaw (rad) about MuJoCo +Z from a world-from-body quaternion."""
+        w, x, y, z = (float(v) for v in quat_wxyz)
+        fx = 1.0 - 2.0 * (y * y + z * z)
+        fy = 2.0 * (x * y + w * z)
+        return float(np.arctan2(fy, fx))
+
+    def _CaptureClosedLoopAnchor(self):
+        """Snapshot MANN init pose + Go1 init qpos once Go1 physics starts.
+
+        Why separate snapshots? MANN and Go1 live in different worlds — MANN
+        dog is y-up, Go1 is z-up — and both start at some non-zero pose
+        (MANN has a non-zero yaw driven by the initial guidance state). We
+        anchor on the frame Go1 first becomes active so later corrections
+        express displacement as Δ in each side's own initial body frame.
+        """
+        root = self.Actor.Root.copy()
+        mann_pos = np.asarray(Transform.GetPosition(root), dtype=np.float32).copy()
+        mann_yaw = self._mann_root_yaw_rad(root)
+        go1_qpos = np.asarray(self.Go1.data.qpos[:7], dtype=np.float32).copy()
+        self._cl_anchor = {
+            "mann_pos": mann_pos,          # (3,) dog world (y-up)
+            "mann_yaw": mann_yaw,          # rad, about dog y
+            "go1_xy": go1_qpos[:2].copy(), # (2,) MuJoCo ground plane
+            "go1_yaw": self._quat_yaw_rad(go1_qpos[3:7]),
+        }
+
+    def _ApplyClosedLoopCorrection(self):
+        """Inject Go1's MuJoCo pose back into MANN's Actor.Root before Predict().
+
+        The correction is *ground-plane only*: (Δx_dog, Δz_dog, Δyaw) derived
+        from Go1's displacement in its initial body frame, mapped into MANN's
+        initial body frame. Height and local bone rotations are left alone —
+        Go1 cannot express MANN's full pose (spine/tail/head/ears) so we stay
+        within the ground-plane invariants MANN actually cares about for
+        stride planning.
+
+        Applied as a rigid body-frame lerp against Actor.Root with gain
+        CLOSED_LOOP_GAIN, and the same lerped transform is pushed through
+        Actor.Transforms / Actor.Velocities / SimulationObject.Transforms so
+        the next Control() + Predict() see a consistent world.
+        """
+        if CLOSED_LOOP_GAIN <= 0.0:
+            return
+        if not self.Go1Active():
+            # Reset anchor when Go1 is toggled off, so re-enabling re-captures.
+            self._cl_anchor = None
+            return
+
+        if self._cl_anchor is None:
+            self._CaptureClosedLoopAnchor()
+            return  # first tick has nothing to correct against
+
+        anc = self._cl_anchor
+        go1_xy = np.asarray(self.Go1.data.qpos[:2], dtype=np.float32)
+        go1_yaw = self._quat_yaw_rad(self.Go1.data.qpos[3:7])
+
+        # Δ in Go1's initial body frame (rotate world Δxy by -go1_yaw_init).
+        dxy = go1_xy - anc["go1_xy"]
+        c0, s0 = float(np.cos(-anc["go1_yaw"])), float(np.sin(-anc["go1_yaw"]))
+        d_fwd = c0 * dxy[0] - s0 * dxy[1]
+        d_lat = s0 * dxy[0] + c0 * dxy[1]
+        d_lat *= CLOSED_LOOP_LAT_SIGN
+
+        # Map (fwd, lat) into MANN's initial body frame.
+        # MANN dog y-up, forward is Root's +Z column, right is Root's -X column.
+        my = float(anc["mann_yaw"])
+        fwd_x, fwd_z = float(np.sin(my)), float(np.cos(my))
+        right_x, right_z = fwd_z, -fwd_x
+        dx_mann = d_fwd * fwd_x + d_lat * right_x
+        dz_mann = d_fwd * fwd_z + d_lat * right_z
+
+        target_pos = anc["mann_pos"].copy()
+        target_pos[0] += dx_mann
+        target_pos[2] += dz_mann
+        # Leave y (height) alone — preserves whatever height MANN is at.
+        target_pos[1] = float(Transform.GetPosition(self.Actor.Root)[1])
+
+        target_yaw_rad = anc["mann_yaw"] + (go1_yaw - anc["go1_yaw"])
+        target_yaw_deg = np.degrees(np.asarray(target_yaw_rad, dtype=np.float32))
+        target_rot = Rotation.RotationY(target_yaw_deg)
+        target_root = Transform.TR(target_pos, target_rot)
+
+        old_root = self.Actor.Root.copy()
+        new_root = Transform.Interpolate(old_root, target_root, CLOSED_LOOP_GAIN)
+
+        # Shift Actor's bones + velocities + SimulationObject's root series so
+        # the whole world rotates/translates rigidly by (new_root · old_root⁻¹).
+        self.Actor.Transforms = Transform.TransformationFromTo(
+            self.Actor.Transforms, old_root, new_root
+        )
+        self.Actor.Velocities = Vector3.DirectionFromTo(
+            self.Actor.Velocities, old_root, new_root
+        )
+        self.SimulationObject.Transforms = Transform.TransformationFromTo(
+            self.SimulationObject.Transforms, old_root, new_root
+        )
+        self.SimulationObject.Velocities = Vector3.DirectionFromTo(
+            self.SimulationObject.Velocities, old_root, new_root
+        )
+        self.Actor.Root = new_root
 
     def Go1RootQpos(self):
         """Return (root7, qpos12) arrays. Zeros if inactive."""
