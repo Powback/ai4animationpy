@@ -296,7 +296,11 @@ def load_all_clips(npz_dir: Path) -> list[tuple[np.ndarray, np.ndarray]]:
     for f in files:
         d = np.load(f, allow_pickle=True)
         pos = d["positions"].astype(np.float32)  # [F, 23, 3]
-        quat = d["quaternions"].astype(np.float32)  # [F, 23, 4]
+        # BUG: NPZs store XYZW (scipy default) but quat_to_matrix expects WXYZ.
+        # This pilot loads them as-is, so rotation matrices are WRONG.
+        # The network learned consistent-but-wrong features and still converged.
+        # FIXED in boxing_train_v2.py: np.concatenate([q[...,3:4], q[...,:3]], axis=-1)
+        quat = d["quaternions"].astype(np.float32)  # [F, 23, 4] — XYZW, not WXYZ!
         clips.append((pos, quat))
     return clips
 
