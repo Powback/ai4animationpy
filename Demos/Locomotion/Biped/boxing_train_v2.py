@@ -485,6 +485,7 @@ class BoxingControllerONNX(nn.Module):
 def export_onnx(model, output_dir: Path, device: torch.device) -> None:
     model.eval()
     wrapper = BoxingControllerONNX(model).to(device)
+    wrapper.eval()
     dummy_x = torch.zeros(1, INPUT_DIM, device=device)
 
     onnx_path = output_dir / "boxer_controller_v2.onnx"
